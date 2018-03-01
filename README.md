@@ -30,9 +30,9 @@ Final Idea-->
 
 
     SSL_TO_SERVER{
-    ENC_W_PUB{
-    SIG_W_PRIV{
-             MSG(MSG_ID,TIMESTAMP,MSG,FLAGS)
-         }
-    }
+        ENC_W_PUB{
+            SIG_W_PRIV{
+                MSG(MSG_ID,TIMESTAMP,MSG,FLAGS)
+            }
+        }
     }

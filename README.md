@@ -17,9 +17,9 @@ cli# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypt
 
 Message Idea:
 
-/*
+
  *MESSAGE STRUCTURE 1:
- *
+ 
  * SSL_TO_SERVER{
  *	ENCRYPTED_WITH_PUBLIC{
  * 		SIGNED_WITH_PRIVATE{
@@ -29,10 +29,9 @@ Message Idea:
  *		}
  *	}
  *}
- *
- *
+ 
  *MESSAGE STRUCTURE 2:
- *
+ 
  * SSL_TO_SERVER{
  *	ENCRYPED_WITH_PUBLIC{
  * 		SIGNED_WITH_PRIVATE{AES_SESSION_KEY}
@@ -43,6 +42,3 @@ Message Idea:
  *		flags/special
  * 	}
  * }
- *
- *
- */

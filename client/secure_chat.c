@@ -49,8 +49,8 @@ struct _msg {
 
 int main(int argc,char* argv[]){
 	puts("Starting secure chat application...");
-	puts("Verify the source at: ('https://www.github.com/kping0/secchatapp/client')");
-	puts("Host your own server with ('https://.www.github.com/kping0/secchatapp/server')");
+	puts("Verify the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
+	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
 	
 	/*
 	*
@@ -81,7 +81,7 @@ int main(int argc,char* argv[]){
 	SSL_CTX_load_verify_locations(ctx,HOST_CERT,NULL); /*Link to server cert.pem to check against*/
 	
 	/*
-	* Set connection variables 
+	* Create BIO - Set Conn HOSTNAME:PORT - Ignore outdated ciphers
 	*
 	*/		
 	bio_obj = BIO_new_ssl_connect(ctx);
@@ -107,13 +107,13 @@ int main(int argc,char* argv[]){
 		return 1;
 	} 
 	/*
-	* SSL Connection Built, main application
+	* SSL Connection Built, main application following
 	*
 	*/
 	BIO_puts(bio_obj,"test\n");
 	
 	/*
-	* Free All SSL Objects
+	* CLEANUP
 	*
 	*/	
 	BIO_free_all(bio_obj);

@@ -14,14 +14,14 @@ To compile:
 
 cli# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypto && chmod +x SimpleSecureChat
 
-Message_IDEA:
+Message_IDEA:\n
 SSL_TO_SERVER{
     ENC_W_PUB{
         SIG_W_PRIV{
              MSG
          }
     }
-OR
+\nOR\n
 
 SSL_TO_SERVER{
     ENC_W_PUB{
@@ -29,5 +29,4 @@ SSL_TO_SERVER{
              SESSION_ENC_KEY;
          }
     }
-    
-    ENC_W_SESSION_KEY{MSG}
+   \nENC_W_SESSION_KEY{MSG}

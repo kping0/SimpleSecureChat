@@ -12,7 +12,7 @@ Requirements:
 
 To compile:
 
-    cli# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypto && chmod +x SimpleSecureChat
+    client# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypto && chmod +x SimpleSecureChat
 
 
 Debugging with ncat: 

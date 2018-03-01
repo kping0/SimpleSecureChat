@@ -6,7 +6,6 @@
 #include <openssl/bn.h>
 /*
 *Variables for message Caching Server
-*
 */
 #define HOST_NAME "xxx.xxx.xxx.xxx"
 #define HOST_PORT "5050"

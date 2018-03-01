@@ -35,7 +35,7 @@ Message Idea:
  SSL_TO_SERVER{
  ENCRYPED_WITH_PUBLIC{
      SIGNED_WITH_PRIVATE{AES_SESSION_KEY}
-  	}
+  	} ////
   	ENCRYPTED_WITH_SESSION_KEY{
  		msg_id,
  		msg,

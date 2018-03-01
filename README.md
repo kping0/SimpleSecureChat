@@ -27,8 +27,9 @@ server# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 3
 
 Final Idea-->
 
-SSL_TO_SERVER{
 
+
+    SSL_TO_SERVER{
     ENC_W_PUB{
     SIG_W_PRIV{
              MSG(MSG_ID,TIMESTAMP,MSG,FLAGS)

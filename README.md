@@ -21,3 +21,12 @@ SSL_TO_SERVER{
              MSG
          }
     }
+OR
+
+SSL_TO_SERVER{
+    ENC_W_PUB{
+        SIG_W_PRIV{
+             SESSION_ENC_KEY;
+         }
+    }
+ENC_W_SESSION_KEY{MSG}

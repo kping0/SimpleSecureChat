@@ -1,6 +1,8 @@
 # SimpleSecureChat
 A simple program written in C mainly using libOpenSSL for a Simple, yet Secure chat.
 
+!!! STILL IN DEVELOPMENT NOT YET FUNCTIONAL!!!
+
 Requirements:
 1. openssl-dev (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 2. gcc (sudo yum install gcc || sudo apt-get install gcc)

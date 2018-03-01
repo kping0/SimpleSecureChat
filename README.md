@@ -14,13 +14,16 @@ To compile:
 
 cli# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypto && chmod +x SimpleSecureChat
 
+
 Debugging with ncat: 
 
 server# ncat --ssl -klvp 5050 --ssl-key key.pem --ssl-cert cert.pem 
 
+
 Command to Create Server Certificate 
 
 server# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 
+
 
 Message_Enc_Scheme-->
 SSL_TO_SERVER{

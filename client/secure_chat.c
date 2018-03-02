@@ -149,11 +149,11 @@ void DeSerialize_MSG(struct _msg *msg_str,binn *obj){ /* De-Serializes a "binn" 
 
 int main(int argc,char* argv[]){
 	puts("Starting secure chat application...");
-	puts("Get the source at: ('https://www.github.com/kping0/secchatapp/client')");
-	puts("Host your own server with ('https://.www.github.com/kping0/secchatapp/server')");
+	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
+	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
 	
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
-	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
+	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection*/
 		BIO_puts(tls_vars->bio_obj,"test\n");
 		puts("SSL/TLS_SUCCESS --> connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
 	}

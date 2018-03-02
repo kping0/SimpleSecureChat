@@ -13,8 +13,8 @@
 *Variables for message Caching Server
 */
 
-#define HOST_NAME "13.58.190.13" 
-#define HOST_PORT "80"
+#define HOST_NAME "xxx.xxx.xxx.xxx" 
+#define HOST_PORT "5050"
 #define HOST_CERT "public.pem"
 
  /*

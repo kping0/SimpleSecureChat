@@ -8,7 +8,7 @@
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
-#include <binn.h> //Data Serialization Library
+#include <binn.h> //Data Serialization Library ("https://github.com/liteserver/binn")
 /*
 *Variables for message Caching Server
 */

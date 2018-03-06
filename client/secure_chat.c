@@ -244,6 +244,40 @@ void CreateKeyPair(void){
     RSA_free(rsa);
     return;
 }
+
+void test_envelope(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){
+	//encrypt test	
+	unsigned char* msg = malloc(250);
+	strncpy(msg,"A B C D E F G H I J K L M N O P Q R S T U V W X Y Z",250);
+	printf("Message before encryption: %s\n",msg);
+	unsigned char* ek = malloc(EVP_PKEY_size(pubk_evp)); //allocate memory for symmetric enc key
+	int ekl = EVP_PKEY_size(pubk_evp); // set ekl(enc key length) to sizeof publickey
+	unsigned char* iv = malloc(EVP_MAX_IV_LENGTH);
+	RAND_pseudo_bytes(iv,EVP_MAX_IV_LENGTH);
+	unsigned char*enc_buf = malloc(2000);
+
+	int enc_len = envelope_seal(&pubk_evp,msg,strlen(msg),&ek,&ekl,iv,enc_buf); //encrypt
+	
+	int i = 0;
+	printf("Ciphertext:{\n ");
+	while(i <= enc_len){
+		printf("%x",enc_buf[i]);
+		i++;	
+	}
+	printf("\n}\n");
+
+	//decrypt test
+	unsigned char* dec_buf = malloc(5000);
+	
+	int dec_len = envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
+	i = 0;
+	printf("Message after decryption:");
+	while(i <= dec_len){
+		printf("%c",dec_buf[i]);
+		i++;
+	}
+	return;
+}
 int main(int argc,char* argv[]){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
@@ -267,7 +301,10 @@ int main(int argc,char* argv[]){
 		(void)CreateKeyPair();
 	}
 	else {
-		puts("Loaded Keypair");
+		puts("Loaded Keypair,beginning Encryption/Decryption Test");
+		puts("START TEST");
+		test_envelope(pubk_evp,priv_evp);
+		puts("END TEST");
 	}
 
 

@@ -221,6 +221,29 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey){ // EVP_PKEY* pubk_evp = EV
 	return 1;
 
 }
+void CreateKeyPair(void){
+    RSA* rsa = RSA_generate_key(4096, RSA_F4, NULL, 0);
+    int check_key = RSA_check_key(rsa);
+    while (check_key <= 0) {
+        puts( "error...regenerating...");
+        rsa = RSA_generate_key(4096, RSA_F4, NULL, 0);
+        check_key = RSA_check_key(rsa);
+    }
+    RSA_blinding_on(rsa, NULL);
+
+    // write out pem-encoded public key ----
+    BIO* rsaPublicBio = BIO_new_file(PUB_KEY, "w");
+    PEM_write_bio_RSAPublicKey(rsaPublicBio, rsa);
+
+    // write out pem-encoded encrypted private key ----
+    BIO* rsaPrivateBio = BIO_new_file(PRIV_KEY, "w");
+    PEM_write_bio_RSAPrivateKey(rsaPrivateBio, rsa, NULL, NULL, 0, NULL, NULL);
+
+    BIO_free(rsaPublicBio);
+    BIO_free(rsaPrivateBio);
+    RSA_free(rsa);
+    return;
+}
 int main(int argc,char* argv[]){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/secchatapp/client')");

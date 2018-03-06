@@ -246,8 +246,8 @@ void CreateKeyPair(void){
 }
 int main(int argc,char* argv[]){
 	puts("Starting secure chat application...");
-	puts("Get the source at: ('https://www.github.com/kping0/secchatapp/client')");
-	puts("Host your own server with ('https://.www.github.com/kping0/secchatapp/server')");
+	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
+	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/

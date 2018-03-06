@@ -261,10 +261,10 @@ int main(int argc,char* argv[]){
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!LoadKeyPair(pubk_evp,priv_evp)){
-		puts("Error Loading Keypair");
+		puts("Error Loading Keypair,creating new pair");
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
-		
+		(void)CreateKeyPair();
 	}
 	else {
 		puts("Loaded Keypair");

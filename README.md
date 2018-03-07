@@ -1,7 +1,7 @@
 # SimpleSecureChat
 A simple program written in C mainly using libOpenSSL for a Simple, yet Secure chat.
 
------> PRE ALPHA!! <-------
+PRE-ALPHA
 
 Requirements:
 1. openssl-dev (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
@@ -10,8 +10,7 @@ Requirements:
 
 To compile:
 
-    client# rm -f SimpleSecureChat; gcc -o SimpleSecureChat secure_chat.c -lssl -lcrypto -lbinn && chmod +x SimpleSecureChat
-
+    Use makescript.sh in client folder
 
 Debugging with ncat: 
 
@@ -22,15 +21,3 @@ Command to Create Server Certificate
 
     server# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 
 
-
-Final Idea-->
-
-
-
-    SSL_TO_SERVER{
-        ENC_W_PUB{
-            SIG_W_PRIV{
-                MSG(MSG_ID,TIMESTAMP,MSG,FLAGS)
-            }
-        }
-    }

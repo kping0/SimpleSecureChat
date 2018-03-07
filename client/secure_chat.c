@@ -7,34 +7,21 @@
 #include <openssl/rsa.h>
 #include <openssl/conf.h>
 #include <openssl/evp.h>
-#include <openssl/err.h>
+#include <openssl/err.h> 
+#include <openssl/rand.h> 
 #include <binn.h> //Data Serialization Library
 /*
 * Application Settings
 */
 
-#define HOST_NAME "13.58.190.13" 
+#define HOST_NAME "127.0.0.1" 
 #define HOST_PORT "80"
 #define HOST_CERT "public.pem"
 #define PUB_KEY "rsapublickey.pem"
 #define PRIV_KEY "rsaprivatekey.pem"
 
  /*
- *MESSAGE STRUCTURE
- *
- * SSL_TO_SERVER{ 					
- *	ENCRYPED_WITH_PUBLIC{				
- * 		SIGNED_WITH_PRIVATE{AES_SESSION_KEY}	
- * 	}
- * 	ENCRYPTED_WITH_SESSION_KEY{ 			
- *		msg_id,
- *		msg,
- *		flags/special
- * 	}
- * }
- */
- /*
- * Structure for message.
+ * Structure for message
  */
 struct _msg {
 	int msg_id;
@@ -117,7 +104,7 @@ int TLS_conn(struct ssl_str *tls_vars){ //return 1 on success, 0 on error
 	tls_vars->bio_obj = NULL;
 	tls_vars->ssl_obj = NULL;
 	tls_vars->ctx = NULL;
-	tls_vars->sslmethod;
+	tls_vars->sslmethod = NULL;
 	tls_vars->sslmethod = SSLv23_method();
 	if(!(NULL != tls_vars->sslmethod)) return 0;
 	tls_vars->ctx = SSL_CTX_new(tls_vars->sslmethod); /* Generate SSL_CTX*/
@@ -172,7 +159,7 @@ int TLS_conn(struct ssl_str *tls_vars){ //return 1 on success, 0 on error
 }
 
 void ALL_cleanup(struct ssl_str *tls_vars){ /*Cleanup*/
-	EVP_cleanup;
+	EVP_cleanup();
 	CRYPTO_cleanup_all_ex_data();
 	ERR_free_strings();
 	BIO_free_all(tls_vars->bio_obj);
@@ -194,9 +181,9 @@ void DeSerialize_binn_decmsg(struct _msg *msg_str,void *ptr_buf){ /* De-Serializ
 	strncpy(msg_str->timestamp,binn_object_str(obj,"timestamp"),sizeof(msg_str->timestamp));
 }
 
-int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey){ // EVP_PKEY* pubk_evp = EVP_PKEY_new(); EVP_PKEY* priv_evp = EVP_PKEY_new(); <---- NEED TO BE SETUP BEFORE CALLING FUNCTION
+int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey){
 	/*
-	* This Function reads the Public&Private key from files into EVP_PKEY objects...
+	* This Function reads the Public&Private key from files into (initialized)EVP_PKEY objects...
 	*/
 	BIO* rsa_pub_bio = BIO_new_file(PUB_KEY,"r");
 	if(rsa_pub_bio == NULL){
@@ -217,10 +204,14 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey){ // EVP_PKEY* pubk_evp = EV
 	PEM_read_bio_RSAPrivateKey(rsa_priv_bio, &rsa_priv,NULL,NULL);
 	BIO_free(rsa_priv_bio);
 	EVP_PKEY_assign_RSA(privKey,rsa_priv); 
-	
+	if(RSA_check_key(rsa_priv) <= 0){
+		puts("Invalid Private Key");
+		return 0;	
+	}
 	return 1;
 
 }
+
 void CreateKeyPair(void){
     RSA* rsa = RSA_generate_key(4096, RSA_F4, NULL, 0);
     int check_key = RSA_check_key(rsa);
@@ -245,40 +236,38 @@ void CreateKeyPair(void){
     return;
 }
 
-void test_envelope(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){
+int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of how messages could be encrypted
 	//encrypt test	
-	unsigned char* msg = malloc(250);
-	strncpy(msg,"A B C D E F G H I J K L M N O P Q R S T U V W X Y Z",250);
-	printf("Message before encryption: %s\n",msg);
-	unsigned char* ek = malloc(EVP_PKEY_size(pubk_evp)); //allocate memory for symmetric enc key
-	int ekl = EVP_PKEY_size(pubk_evp); // set ekl(enc key length) to sizeof publickey
+	unsigned char* msg = malloc(100);
+	strncpy((char*)msg,"secret  test_message",100);
+
+	unsigned char* ek = malloc(EVP_PKEY_size(pubk_evp));
+	int ekl = EVP_PKEY_size(pubk_evp); 
+
 	unsigned char* iv = malloc(EVP_MAX_IV_LENGTH);
-	RAND_pseudo_bytes(iv,EVP_MAX_IV_LENGTH);
+	RAND_poll(); //Seed CGRNG 
+	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
+		puts("Error getting CS-RNG for IV");	
+		return 0;	
+	}
+	RAND_poll(); //Change Seed for CGRNG
 	unsigned char*enc_buf = malloc(2000);
-
-	int enc_len = envelope_seal(&pubk_evp,msg,strlen(msg),&ek,&ekl,iv,enc_buf); //encrypt
+	int enc_len = envelope_seal(&pubk_evp,msg,strlen((const char*)msg),&ek,&ekl,iv,enc_buf); //encrypt
 	
-	int i = 0;
-	printf("Ciphertext:{\n ");
-	while(i <= enc_len){
-		printf("%x",enc_buf[i]);
-		i++;	
-	}
-	printf("\n}\n");
-
 	//decrypt test
-	unsigned char* dec_buf = malloc(5000);
-	
-	int dec_len = envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
-	i = 0;
-	printf("Message after decryption:");
-	while(i <= dec_len){
-		printf("%c",dec_buf[i]);
-		i++;
+	unsigned char* dec_buf = malloc(2000);
+	/*int dec_len =*/ envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
+	if(strncmp((const char*)msg,(const char*)dec_buf,strlen((const char*)msg)) == 0){
+		puts("Keypair Test OK");	
 	}
-	return;
+	else{
+		puts("Keypair Test FAIL");
+		return 0;
+	}
+	return 1;
 }
-int main(int argc,char* argv[]){
+
+int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
 	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
@@ -286,6 +275,7 @@ int main(int argc,char* argv[]){
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
 		BIO_puts(tls_vars->bio_obj,"test\n");
+		BIO_
 		puts("SSL/TLS_SUCCESS --> connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
 	}
 	else{
@@ -295,16 +285,14 @@ int main(int argc,char* argv[]){
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!LoadKeyPair(pubk_evp,priv_evp)){
-		puts("Error Loading Keypair,creating new pair");
+		puts("Error Loading Keypair,Creating new RSA-4096 Keypair");
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
 		(void)CreateKeyPair();
 	}
 	else {
-		puts("Loaded Keypair,beginning Encryption/Decryption Test");
-		puts("START TEST");
-		test_envelope(pubk_evp,priv_evp);
-		puts("END TEST");
+		puts("Loaded Keypair");
+		test_keypair(pubk_evp,priv_evp);
 	}
 
 

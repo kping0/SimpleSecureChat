@@ -1,8 +1,15 @@
 #!/bin/bash
-cd dependencies/binn/ #YOU CAN GET THIS ON GITHUB!!
-make
-sudo make install #install binn
-cd ../../
+
+#cd dependencies/binn/ #YOU CAN GET THIS ON GITHUB!!
+#make
+#sudo make install #install binn
+#cd ../../
+sudo apt-get install libssl-dev # sudo yum install openssl-devel on fedora
+git clone https://github.com/liteserver/binn
+cd binn
+make 
+sudo make install
+cd ..
 clear
 echo "Compiling Main Application"
 rm -f testbinary

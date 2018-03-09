@@ -15,7 +15,7 @@
 */
 
 #define HOST_NAME "127.0.0.1" 
-#define HOST_PORT "80"
+#define HOST_PORT "5050"
 #define HOST_CERT "public.pem"
 #define PUB_KEY "rsapublickey.pem"
 #define PRIV_KEY "rsaprivatekey.pem"
@@ -275,7 +275,6 @@ int main(void){
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
 		BIO_puts(tls_vars->bio_obj,"test\n");
-		BIO_
 		puts("SSL/TLS_SUCCESS --> connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
 	}
 	else{

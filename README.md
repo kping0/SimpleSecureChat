@@ -7,7 +7,7 @@ Requirements:
 1. openssl-dev (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 2. gcc (sudo yum install gcc || sudo apt-get install gcc)
 3. binn (Data Serialization Library) available on github
-
+4. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
 To compile:
 
     Use makescript.sh in client folder

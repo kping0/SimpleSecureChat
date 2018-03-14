@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
+
 #include <openssl/ssl.h>
 #include <openssl/crypto.h> 
 #include <openssl/bn.h>
@@ -11,7 +13,6 @@
 #include <openssl/rand.h> 
 #include <openssl/bio.h>
 #include <binn.h> //Data Serialization Library
-#include <string.h>
 #include <sqlite3.h> // SQLite 3 Library
 
 

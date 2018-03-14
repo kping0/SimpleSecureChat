@@ -4,8 +4,17 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-
-int create_socket(int port){
+#include <openssl/bio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <openssl/crypto.h> 
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
+#include <openssl/conf.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h> 
+int create_socket(int port)
+{
     int s;
     struct sockaddr_in addr;
 
@@ -76,7 +85,7 @@ void configure_context(SSL_CTX *ctx)
     }
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
     int sock;
     SSL_CTX *ctx;
@@ -86,31 +95,49 @@ int main(int argc, char **argv)
 
     configure_context(ctx);
 
-    sock = create_socket(80);
+    sock = create_socket(5050);
 
     /* Handle connections */
     while(1) {
         struct sockaddr_in addr;
         uint len = sizeof(addr);
         SSL *ssl;
-        const char reply[] = "test_server\n";
-
+	ssl = SSL_new(ctx);
+        SSL_set_fd(ssl, client);
+	BIO *sbio = BIO_new(BIO_s_socket());
+	BIO_set_fd(sbio,client,BIO_NOCLOSE);
+	SSL_set_bio(ssl,sbio,sbio);
+	
         int client = accept(sock, (struct sockaddr*)&addr, &len);
         if (client < 0) {
             perror("Unable to accept");
             exit(EXIT_FAILURE);
         }
 
-        ssl = SSL_new(ctx);
+        /*ssl = SSL_new(ctx);
         SSL_set_fd(ssl, client);
-
+	BIO *sbio = BIO_new(BIO_s_socket());
+	BIO_set_fd(sbio,client,BIO_NOCLOSE);
+	SSL_set_bio(ssl,sbio,sbio);
+	//sbio = BIO_s_accept()*/
+	
         if (SSL_accept(ssl) <= 0) {
             ERR_print_errors_fp(stderr);
         }
         else {
-            SSL_write(ssl, reply, strlen(reply));
-        }
-
+            //SSL_write(ssl, reply, strlen(reply));
+		/*BIO* sbio = BIO_new(BIO_s_socket());
+		//sbio = BIO_new_socket(client,BIO_NOCLOSE);	
+		SSL_set_bio(ssl,sbio,sbio);
+		BIO_set_fd(sbio,client,BIO_NOCLOSE);*/
+		char *buf = malloc(200);
+		SSL_read(ssl,buf,200);
+		
+		//BIO_gets(sbio,buf,200);		
+		puts((const char*)buf);
+	
+	}
+	//BIO_free(sbio);
         SSL_free(ssl);
         close(client);
     }

@@ -334,7 +334,6 @@ sqlite3* initDB(void){
 		return NULL;			
 	}
 	sqlite3_finalize(stmt);	
-	free(stmt);
 	return db;
 }
 

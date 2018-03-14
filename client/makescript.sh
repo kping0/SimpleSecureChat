@@ -1,10 +1,5 @@
 #!/bin/bash
-
-#cd dependencies/binn/ #YOU CAN GET THIS ON GITHUB!!
-#make
-#sudo make install #install binn
-#cd ../../
-sudo apt-get install libssl-dev # sudo yum install openssl-devel on fedora
+sudo apt-get install libssl-dev
 sudo apt-get install libsqlite3-dev
 git clone https://github.com/liteserver/binn
 cd binn

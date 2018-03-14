@@ -9,17 +9,22 @@
 #include <openssl/evp.h>
 #include <openssl/err.h> 
 #include <openssl/rand.h> 
+#include <openssl/bio.h>
 #include <binn.h> //Data Serialization Library
+#include <string.h>
+#include <sqlite3.h> // SQLite 3 Library
+
+
 /*
 * Application Settings
 */
 
-#define HOST_NAME "127.0.0.1" 
-#define HOST_PORT "5050"
-#define HOST_CERT "public.pem"
-#define PUB_KEY "rsapublickey.pem"
-#define PRIV_KEY "rsaprivatekey.pem"
-
+#define HOST_NAME "127.0.0.1" //Server IP
+#define HOST_PORT "5050" //Server Port
+#define HOST_CERT "public.pem" // Server public certificate (X509 Public Cert)
+#define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
+#define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
+#define DB_FNAME "sscdb.db" //SQLITE Database Filename
  /*
  * Structure for message
  */
@@ -267,6 +272,22 @@ int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of ho
 	return 1;
 }
 
+sqlite3* initDB(void){
+	sqlite3 *db;
+	int rc = sqlite3_open(DB_FNAME,&db);
+	char *errm = 0;
+	if(rc){ 
+		sqlite3_free(errm);
+		return NULL;
+	}
+	char* sql = "CREATE TABLE MESSAGES(MSGID INT PRIMARY KEY NOT NULL,USERNAME TEXT NOT NULL,MESSAGE TEXT);";
+	sqlite3_exec(db,sql,NULL,0,&errm);
+	sql = "insert into messages(msgid,username,message)values(1,'testuser','testmessage');";
+	sqlite3_exec(db,sql,NULL,0,&errm);
+	sqlite3_free(errm);
+	return db;
+}
+
 int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
@@ -274,7 +295,7 @@ int main(void){
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
-		BIO_puts(tls_vars->bio_obj,"test\n");
+		BIO_write(tls_vars->bio_obj,"12345",5);
 		puts("SSL/TLS_SUCCESS --> connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
 	}
 	else{
@@ -284,18 +305,34 @@ int main(void){
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!LoadKeyPair(pubk_evp,priv_evp)){
-		puts("Error Loading Keypair,Creating new RSA-4096 Keypair");
+		puts("Error Loading Keypair,generating new keypair");
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
-		(void)CreateKeyPair();
+		CreateKeyPair();
+		
 	}
 	else {
 		puts("Loaded Keypair");
 		test_keypair(pubk_evp,priv_evp);
 	}
-
-
-
+	//Load SQLITE Database
+	sqlite3 *db = initDB();
+	if(db != NULL){
+			sqlite3_stmt *stmt;
+			sqlite3_prepare_v2(db,"select * from messages where msgid=1",-1,&stmt,NULL);
+			if(sqlite3_step(stmt) == SQLITE_ROW){
+				puts("Successfully loaded SQLITE DB");
+			}else{
+				puts("Error Loading SQLITE DB");			
+			}
+			sqlite3_finalize(stmt);	
+	}else{
+		puts("Error loading SQLITE DB");			
+	}
+	/*
+	More Coming...
+	*/
+	sqlite3_close(db);
 	(void)ALL_cleanup(tls_vars); 
 	free(tls_vars);
 	tls_vars = NULL;

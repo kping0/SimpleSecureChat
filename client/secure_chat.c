@@ -22,15 +22,15 @@
 
 #define HOST_NAME "127.0.0.1" //Server IP
 #define HOST_PORT "5050" //Server Port
-#define HOST_CERT "public.pem" // Server public certificate (X509 Public Cert)
-#define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
-#define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
+#define HOST_CERT "serverpublic.pem" // Server public certificate (X509 Public Cert)
+#define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)(4096 BIT KEYPAIR)
+#define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)(4096 BIT KEYPAIR)
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename
  /*
  * Structure for message
  */
 struct _msg {
-	int msg_id;
+	int msgid;
 	char timestamp[32];
 	char msg[2048];
 	int flags;
@@ -173,7 +173,7 @@ void ALL_cleanup(struct ssl_str *tls_vars){ /*Cleanup*/
 }
 
 void Serialize_binn_decmsg(struct _msg *msg_str,binn *obj){ /*Serializes a _msg structure to a "binn" */
-	binn_object_set_int32(obj,"msg_id",msg_str->msg_id);
+	binn_object_set_int32(obj,"msgid",msg_str->msgid);
 	binn_object_set_str(obj,"msg",msg_str->msg);
 	binn_object_set_str(obj,"timestamp",msg_str->timestamp);
 	binn_object_set_int32(obj,"flags",msg_str->flags);
@@ -181,7 +181,7 @@ void Serialize_binn_decmsg(struct _msg *msg_str,binn *obj){ /*Serializes a _msg 
 
 void DeSerialize_binn_decmsg(struct _msg *msg_str,void *ptr_buf){ /* De-Serializes a buffer containing a "binn" obj to a _msg structure*/
 	binn *obj = binn_open(ptr_buf);
-	msg_str->msg_id = binn_object_int32(obj,"msg_id");
+	msg_str->msgid = binn_object_int32(obj,"msgid");
 	msg_str->flags = binn_object_int32(obj,"flags");
 	strncpy(msg_str->msg,binn_object_str(obj,"msg"),sizeof(msg_str->msg));
 	strncpy(msg_str->timestamp,binn_object_str(obj,"timestamp"),sizeof(msg_str->timestamp));

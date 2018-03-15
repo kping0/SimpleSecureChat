@@ -15,7 +15,7 @@
 #include <openssl/pem.h>
 
 #include <binn.h> //Data Serialization Library
-#include <sqlite3.h>
+#include <sqlite3.h> 
 
 /* SOURCES  & MENTIONS
 * https://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c
@@ -32,15 +32,7 @@
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename
- /*
- * Structure for message
- */
-struct _msg {
-	int msg_id;
-	char timestamp[32];
-	char msg[2048];
-	int flags;
-};
+
  /*
  *  structure used to passthrough OpenSSL objects through various functions (ex main()>>TLS_init())
  */
@@ -52,10 +44,8 @@ struct ssl_str{
 	int success;	
 	};
 
-/*
-* SNIPPET FROM THE OPENSSL WIKI 
-*/
 
+/* SNIPPET FROM THE OPENSSL WIKI*/
 int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_len,
 	unsigned char *encrypted_key, int encrypted_key_len, unsigned char *iv,
 	unsigned char *plaintext){
@@ -75,10 +65,7 @@ int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_
 	return plaintext_len;
 }
 
-/*
-* SNIPPET FROM THE OPENSSL WIKI
-*/
-
+/* SNIPPET FROM THE OPENSSL WIKI*/
 int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
 	unsigned char **encrypted_key, int *encrypted_key_len, unsigned char *iv,
 	unsigned char *ciphertext){
@@ -206,21 +193,6 @@ int TLS_conn(struct ssl_str *tls_vars){ //return 1 on success, 0 on error
 	return 1;
 }
 
-void Serialize_binn_decmsg(struct _msg *msg_str,binn *obj){ /*Serializes a _msg structure to a "binn" */
-	binn_object_set_int32(obj,"msg_id",msg_str->msg_id);
-	binn_object_set_str(obj,"msg",msg_str->msg);
-	binn_object_set_str(obj,"timestamp",msg_str->timestamp);
-	binn_object_set_int32(obj,"flags",msg_str->flags);
-}
-
-void DeSerialize_binn_decmsg(struct _msg *msg_str,void *ptr_buf){ /* De-Serializes a buffer containing a "binn" obj to a _msg structure*/
-	binn *obj = binn_open(ptr_buf);
-	msg_str->msg_id = binn_object_int32(obj,"msg_id");
-	msg_str->flags = binn_object_int32(obj,"flags");
-	strncpy(msg_str->msg,binn_object_str(obj,"msg"),sizeof(msg_str->msg));
-	strncpy(msg_str->timestamp,binn_object_str(obj,"timestamp"),sizeof(msg_str->timestamp));
-}
-
 int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey){
 	/*
 	* This Function reads the Public&Private key from files into (initialized)EVP_PKEY objects...
@@ -341,6 +313,7 @@ sqlite3* initDB(void){
 		return NULL;			
 	}
 	sqlite3_finalize(stmt);	
+	stmt = NULL;
 	return db;
 }
 void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db){ // adds user to DB
@@ -352,22 +325,18 @@ void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db){ // adds user to D
 	
 	len = i2d_RSAPublicKey(userpubkey, &buf);
 	if (len < 0) return;
-	b64buf = base64encode(buf,len);
+	b64buf = (unsigned char*)base64encode(buf,len);
 	sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
 	sqlite3_bind_text(stmt,1,username,-1,0);
 	sqlite3_bind_text(stmt,2,(const char*)b64buf,-1,0);
 	sqlite3_bind_int(stmt,3,len);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
-
-	free(buf);
-	buf = NULL;
-	free(b64buf);
-	b64buf = NULL;
+	stmt = NULL;
 	return;
 }
 
-int getUserUID(char* username,sqlite3 *db){ //gets user UID from DB (to add a message to db for ex.)
+int getUserUID(char* username,sqlite3 *db){ //gets uid from user (to add a message to db for ex.)
 	int uid = -1; //default is error	
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,"select uid from knownusers where username = ?1",-1,&stmt,NULL);
@@ -376,6 +345,7 @@ int getUserUID(char* username,sqlite3 *db){ //gets user UID from DB (to add a me
 		uid = sqlite3_column_int(stmt,0);
 	}
 	sqlite3_finalize(stmt);
+	stmt = NULL;
 	return uid;
 }
 
@@ -384,9 +354,11 @@ int DBUserInit(sqlite3 *db){ //check for own user & create if no found
 	sqlite3_prepare_v2(db,"select username from knownusers where uid=1",-1,&stmt,NULL); //check for own user.
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		sqlite3_finalize(stmt);
+		stmt = NULL;
 	}
 	else{
-		sqlite3_finalize(stmt);		
+		sqlite3_finalize(stmt);	
+		stmt = NULL;	
 		//get user input for username	
 		printf("What do you want your username to be?(200):");
 		char username[200];
@@ -416,6 +388,50 @@ int DBUserInit(sqlite3 *db){ //check for own user & create if no found
 	}
 	return 1;
 }
+
+EVP_PKEY *get_pubk_uid(int uid,sqlite3 *db){ //Get public key based on UID
+	EVP_PKEY *pubkey = EVP_PKEY_new();
+	sqlite3_stmt *stmt;
+	RSA* x = NULL;
+	unsigned char* buf,*b64buf,*p;
+	sqlite3_prepare_v2(db,"select rsapub64,rsalen from knownusers where uid=?1",-1,&stmt,NULL);
+	sqlite3_bind_int(stmt,1,uid);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		int rsalen = sqlite3_column_int(stmt,1);
+		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
+		buf = (unsigned char*)base64decode(b64buf,strlen((const char*)b64buf));
+		p = buf;
+		if(!d2i_RSAPublicKey(&x,(const unsigned char**)&p, rsalen)) return NULL;
+		EVP_PKEY_assign_RSA(pubkey,x);
+	}	
+	sqlite3_finalize(stmt);
+	stmt = NULL;
+	return pubkey;
+}
+
+EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based on Username
+	int uid = getUserUID(username,db); //get UID for username
+	EVP_PKEY *pubkey = EVP_PKEY_new();
+	sqlite3_stmt *stmt;
+	RSA* x = NULL;
+	unsigned char *buf,*b64buf,*p;
+	sqlite3_prepare_v2(db,"select rsapub64,rsalen from knownusers where uid=?1",-1,&stmt,NULL);
+	sqlite3_bind_int(stmt,1,uid);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		int rsalen = sqlite3_column_int(stmt,1);
+		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
+		buf = (unsigned char*)base64decode(b64buf,strlen((const char*)b64buf));
+		p = buf;
+		if(!d2i_RSAPublicKey(&x,(const unsigned char**)&p, rsalen)) return NULL;
+		EVP_PKEY_assign_RSA(pubkey,x);
+	}
+	sqlite3_finalize(stmt);
+	stmt = NULL;
+	return pubkey;
+
+}
+
+
 int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
@@ -434,7 +450,7 @@ int main(void){
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!LoadKeyPair(pubk_evp,priv_evp)){
-		puts("LoadKeyPair() ERROR\nCreateKeyPair OK");
+		puts("Loaded Keypair ERROR\nGenerating new keypair OK");
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
 		CreateKeyPair();
@@ -443,27 +459,34 @@ int main(void){
 		
 	}
 	else {
-		puts("LoadKeyPair() OK");
+		puts("Loaded Keypair OK");
 		test_keypair(pubk_evp,priv_evp);
 	}
 	//Load SQLITE Database
 	sqlite3 *db = initDB();
 	if(db != NULL){
-		puts("initDB OK");
+		puts("Loaded User OK");
 	}
 	else{
-		puts("initDB ERROR");
+		puts("Loading db ERROR");
 		sqlite3_close(db);
 		goto CLEANUP;	
 	}
 	if(DBUserInit(db) != 1){
-		puts("DBUserInit() ERROR");
+		puts("userINIT ERROR");
 		sqlite3_close(db);
 		goto CLEANUP;
 	}
-	sqlite3_close(db);
+	
+	//EVP_PKEY *pubk_evp2 = get_pubk_username("username",db);
+	//test_keypair(pubk_evp2,priv_evp);
+	//EVP_PKEY_free(pubk_evp2);	
+
+	
 CLEANUP:
+	
 	puts("Cleaning up Objects...");	
+	sqlite3_close(db);
 	EVP_PKEY_free(pubk_evp);
 	EVP_PKEY_free(priv_evp);
 	EVP_cleanup();

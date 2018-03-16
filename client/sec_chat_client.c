@@ -195,7 +195,7 @@ int main(void){
 	char msg2test[200];
 	while(1){
 		fgets(msg2test,200,stdin);
-		char* encryptedmsg = encryptmsg("anton",msg2test,db);
+		char* encryptedmsg = encryptmsg(yourusername,msg2test,db);
 		puts(decryptmsg(encryptedmsg));
 	}
 	

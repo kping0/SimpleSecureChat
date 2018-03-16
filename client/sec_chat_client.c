@@ -19,7 +19,7 @@
 //Custom Functions
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
-#include "headers/sscdbfunc.h" //DB manipulation functions
+#include "headers/sscdbfunc.h" //DB manipulation functions & B64
 /* SOURCES  & MENTIONS
 * https://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c
 * https://wiki.openssl.org/
@@ -46,6 +46,102 @@ struct ssl_str{
 	const SSL_METHOD *sslmethod;
 	};
 #endif
+
+const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+	if(strlen((const char*)message) > 1024){
+		puts("Message too long(limit 1024)");
+		return NULL;	
+	}
+	binn* obj;
+	obj = binn_object();	
+	EVP_PKEY * userpubk = get_pubk_username(username,db); //get recipients public key
+	sqlite3_stmt *stmt;
+	binn_object_set_str(obj,"receiver",username);
+	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
+	if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
+		binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
+	}
+	sqlite3_finalize(stmt);
+
+	unsigned char* ek = malloc(EVP_PKEY_size(userpubk));
+	int ekl = EVP_PKEY_size(userpubk); 
+
+	unsigned char* iv = malloc(EVP_MAX_IV_LENGTH);
+	RAND_poll();  
+	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
+		puts("Error getting CS-RNG for IV");	
+		return NULL;	
+	}
+	RAND_poll();
+	unsigned char*enc_buf = malloc(2000);
+	int enc_len = envelope_seal(&userpubk,message,strlen((const char*)message),&ek,&ekl,iv,enc_buf); //encrypt
+	if(enc_len <= 0){
+		puts("Error Encrypting Message!");
+		return NULL;	
+	}
+
+	binn_object_set_blob(obj,"ek",ek,ekl);
+	binn_object_set_int32(obj,"ekl",ekl);
+	binn_object_set_blob(obj,"enc_buf",enc_buf,enc_len);
+	binn_object_set_int32(obj,"enc_len",enc_len);
+	binn_object_set_int32(obj,"iv_len",EVP_MAX_IV_LENGTH);
+	binn_object_set_blob(obj,"iv",iv,EVP_MAX_IV_LENGTH);
+	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //encode w base64
+	free(iv);
+	free(ek);
+	free(enc_buf);
+	binn_free(obj);
+	return final_b64;
+}
+
+const char* decryptmsg(const char *encrypted_buffer){ // Attempts to decrypt buffer with your private key
+	
+	EVP_PKEY *privKey = EVP_PKEY_new();
+	BIO* rsa_priv_bio = BIO_new_file(PRIV_KEY,"r");
+	if(rsa_priv_bio == NULL){
+		puts("error loading private key!"); 
+		return NULL;
+	}
+	RSA* rsa_priv = RSA_new();
+	PEM_read_bio_RSAPrivateKey(rsa_priv_bio, &rsa_priv,NULL,NULL);
+	BIO_free(rsa_priv_bio);
+	EVP_PKEY_assign_RSA(privKey,rsa_priv);
+
+	binn* obj;
+	obj = binn_open(base64decode(encrypted_buffer,strlen(encrypted_buffer)));
+	if(obj == NULL){
+		puts("Error decoding binn object.");
+		return NULL;
+	}	
+	
+	int enc_len = binn_object_int32(obj,"enc_len");
+
+	unsigned char* enc_buf = binn_object_blob(obj,"enc_buf",&enc_len);
+
+	int ekl = binn_object_int32(obj,"ekl");
+	
+	unsigned char* ek = binn_object_blob(obj,"ek",&ekl);
+	
+	int iv_len = binn_object_int32(obj,"iv_len");
+	
+	unsigned char* iv = binn_object_blob(obj,"iv",&iv_len);	
+	
+	unsigned char* dec_buf = malloc(2000);
+	
+	memset(dec_buf,0,2000);
+	
+	int dec_len = envelope_open(privKey,enc_buf,enc_len,ek,ekl,iv,dec_buf);
+	if(dec_len <= 0){
+		puts("Error Decrypting error");
+		return NULL;
+	}
+	char *f_buf = malloc(dec_len);
+	memcpy(f_buf,dec_buf,dec_len);
+	binn_free(obj);
+	free(dec_buf);
+	return (const char*)f_buf;
+}
+
 
 int main(void){
 	puts("Starting secure chat application...");
@@ -88,15 +184,20 @@ int main(void){
 		goto CLEANUP;	
 	}
 	if(DBUserInit(db,PUB_KEY) != 1){
-		puts("userINIT ERROR");
+		puts("Usercheck ERROR");
 		sqlite3_close(db);
 		goto CLEANUP;
 	}
 	
-	//EVP_PKEY *pubk_evp2 = get_pubk_username("username",db);
-	//test_keypair(pubk_evp2,priv_evp);
-	//EVP_PKEY_free(pubk_evp2);	
+	const char* decmsg = decryptmsg(encryptmsg("anton",(unsigned char*)"1234567890qwertyuiopasdnm",db));
+	puts(decmsg);
 
+	char msg2test[200];
+	while(1){
+		fgets(msg2test,200,stdin);
+		char* encryptedmsg = encryptmsg("anton",msg2test,db);
+		puts(decryptmsg(encryptedmsg));
+	}
 	
 CLEANUP:
 	

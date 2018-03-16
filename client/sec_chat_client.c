@@ -20,11 +20,6 @@
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
 #include "headers/sscdbfunc.h" //DB manipulation functions & B64
-/* SOURCES  & MENTIONS
-* https://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c
-* https://wiki.openssl.org/
-*
-*/
 /*
 * Application Settings
 */
@@ -54,7 +49,7 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	}
 	binn* obj;
 	obj = binn_object();	
-	EVP_PKEY * userpubk = get_pubk_username(username,db); //get recipients public key
+	EVP_PKEY * userpubk = get_pubk_username(username,db);
 	sqlite3_stmt *stmt;
 	binn_object_set_str(obj,"receiver",username);
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
@@ -91,22 +86,14 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	free(ek);
 	free(enc_buf);
 	binn_free(obj);
-	return final_b64;
+	return (const char*)final_b64;
 }
 
-const char* decryptmsg(const char *encrypted_buffer){ // Attempts to decrypt buffer with your private key
-	
-	EVP_PKEY *privKey = EVP_PKEY_new();
-	BIO* rsa_priv_bio = BIO_new_file(PRIV_KEY,"r");
-	if(rsa_priv_bio == NULL){
-		puts("error loading private key!"); 
-		return NULL;
+const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attempts to decrypt buffer with your private key
+	if(encrypted_buffer == NULL){
+		puts("Error decrypting");
+		return NULL;	
 	}
-	RSA* rsa_priv = RSA_new();
-	PEM_read_bio_RSAPrivateKey(rsa_priv_bio, &rsa_priv,NULL,NULL);
-	BIO_free(rsa_priv_bio);
-	EVP_PKEY_assign_RSA(privKey,rsa_priv);
-
 	binn* obj;
 	obj = binn_open(base64decode(encrypted_buffer,strlen(encrypted_buffer)));
 	if(obj == NULL){
@@ -136,7 +123,8 @@ const char* decryptmsg(const char *encrypted_buffer){ // Attempts to decrypt buf
 		return NULL;
 	}
 	char *f_buf = malloc(dec_len);
-	memcpy(f_buf,dec_buf,dec_len);
+	memset(f_buf,0,dec_len);
+	memcpy(f_buf,dec_buf,dec_len-1);
 	binn_free(obj);
 	free(dec_buf);
 	return (const char*)f_buf;
@@ -180,23 +168,28 @@ int main(void){
 	}
 	else{
 		puts("Loading db ERROR");
-		sqlite3_close(db);
 		goto CLEANUP;	
 	}
 	if(DBUserInit(db,PUB_KEY) != 1){
 		puts("Usercheck ERROR");
-		sqlite3_close(db);
 		goto CLEANUP;
 	}
-	
-	const char* decmsg = decryptmsg(encryptmsg("anton",(unsigned char*)"1234567890qwertyuiopasdnm",db));
-	puts(decmsg);
 
 	char msg2test[200];
+	char* decbuf;
 	while(1){
+		memset(msg2test,0,200);
 		fgets(msg2test,200,stdin);
-		char* encryptedmsg = encryptmsg(yourusername,msg2test,db);
-		puts(decryptmsg(encryptedmsg));
+		decbuf = (char*)decryptmsg(
+			encryptmsg("user",(unsigned char*)msg2test,db), // <-- This part would be done by the other person to encrypt the message, 
+			priv_evp); // <-- private key to use to decrypt message
+		if(decbuf != NULL){		
+			puts(decbuf);
+		}
+		else{
+			puts("error decrypting message.");
+			goto CLEANUP;		
+		}
 	}
 	
 CLEANUP:

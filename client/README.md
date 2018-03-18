@@ -2,9 +2,9 @@
 
 Not Yet Completed. 
 
-To compile the client, run the included 
+To compile, install "make" and run:
 
-    makescript.sh
+    make
     
 To customize the client, change the definitions on the top of the secure_chat.c file. Example:
 

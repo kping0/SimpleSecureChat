@@ -4,7 +4,7 @@ A simple program written in C mainly using libOpenSSL for a Simple, yet Secure c
 PRE-ALPHA
 
 Requirements:
-1. openssl-dev (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
+1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 4. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
 
 To compile the client install "make" and run:

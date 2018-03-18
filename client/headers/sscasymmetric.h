@@ -29,7 +29,7 @@ int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_le
 
 int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path4privkey);
 
-void CreateKeyPair(char* path4pubkey,char* path4privkey);
+void CreateKeyPair(char* path4pubkey,char* path4privkey,int keysize);
 
 int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp);
 #endif

@@ -174,7 +174,7 @@ int main(void){
 		puts("Usercheck ERROR");
 		goto CLEANUP;
 	}
-
+/*
 	char msg2test[200];
 	char* decbuf;
 	while(1){
@@ -191,7 +191,7 @@ int main(void){
 			goto CLEANUP;		
 		}
 	}
-	
+	*/
 CLEANUP:
 	
 	puts("Cleaning up Objects...");	

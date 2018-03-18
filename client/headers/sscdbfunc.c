@@ -117,7 +117,7 @@ int getUserUID(char* username,sqlite3 *db){ //gets uid from user (to add a messa
 	stmt = NULL;
 	return uid;
 }
-int DBUserInit(sqlite3 *db,char* pkeyfn){ //check for own user & create if no found
+int DBUserInit(sqlite3 *db,char* pkeyfn){ //check for own user & create if not found
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,"select username from knownusers where uid=1",-1,&stmt,NULL); //check for own user.
 	if(sqlite3_step(stmt) == SQLITE_ROW){

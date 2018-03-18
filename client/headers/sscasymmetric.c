@@ -88,12 +88,15 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path
 
 }
 
-void CreateKeyPair(char* path4pubkey,char* path4privkey){
-    RSA* rsa = RSA_generate_key(4096, RSA_F4, NULL, 0);
+void CreateKeyPair(char* path4pubkey,char* path4privkey,int keysize){
+    RSA* rsa = RSA_new();
+    BIGNUM* prime = BN_new();
+    BN_set_word(prime,RSA_F4);
+    RSA_generate_key_ex(rsa,keysize,prime,NULL);
     int check_key = RSA_check_key(rsa);
     while (check_key <= 0) {
         puts( "error...regenerating...");
-        rsa = RSA_generate_key(4096, RSA_F4, NULL, 0);
+	RSA_generate_key_ex(rsa,8192,prime,NULL);
         check_key = RSA_check_key(rsa);
     }
     RSA_blinding_on(rsa, NULL);

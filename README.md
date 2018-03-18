@@ -9,7 +9,7 @@ Requirements:
 
 To compile the client install "make" and run:
 
-    make
+    make #(Run inside of the client directory)
 To cleanup:
 
     make clean

@@ -7,18 +7,20 @@ Requirements:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 4. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
 
+<h2> Client </h2>
+
 To compile the client install "make" and run:
 
     make #(Run inside of the client directory)
-To cleanup:
+    
+To remove generated files(for example to reset the db):
 
     make clean
+<h2> Server </h2>
+To compile the server install "make" and run:
+
+    make #(Run inside of the server directory)
     
-Debugging with ncat: 
-
-    server# ncat --ssl -klvp 5050 --ssl-key key.pem --ssl-cert cert.pem 
-
-
 Command to Create Server Certificate 
 
     server# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 

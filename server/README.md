@@ -11,4 +11,4 @@ Dependencies:
   
      openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 
 
-  Note that this certificate (in this case "cert.pem") ALSO needs to be put in the client directory for server validation to prevent MITM attacks.
+  Note that this certificate (in this case "cert.pem") ALSO needs to be put in the client directory with the name "public.pem"(default configuration) for server validation to prevent MITM attacks. The client will not connect if the server certificate does not match with client/public.pem

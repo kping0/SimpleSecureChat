@@ -1,6 +1,4 @@
-
-
-Not Yet Completed. 
+SimpleSecureChat (Client)
 
 To compile, install "make" and run:
 

@@ -1,6 +1,7 @@
 <h1>SimpleSecureChat</h1>
 A simple program written in C mainly using libOpenSSL for a Simple, yet Secure chat.
-<red>PRE ALPHA</red>
+
+<p1 style="text-color:red"> STILL IN DEVELOPMENT </p1>
 
 Requirements:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 

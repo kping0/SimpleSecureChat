@@ -32,6 +32,103 @@
 #define KEYSIZE 8192 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename
 
+//Message Purposes
+#define MSGSND 1 //Message Send(normal message)
+#define REGRSA 2 //Register user in association with an rsa public key
+#define GETRSA 3 //Get user public key from server
+#define MSGREC 4 //Get new messages
+
+//Prototype functions
+const char* encryptmsg(char* username,unsigned char* message,sqlite3* db); //encrypt buffer message with a public key fetched (index username) from the sqlite3 db (returns encryped buffer)
+
+const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey); // Attempts to decrypt buffer with your private key
+
+const char* registerUserStr(char* username,sqlite3* db); //returns string you can pass to server to register your user with your public key.
+	
+int main(void){
+	puts("Starting secure chat application...");
+	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
+	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
+	//Setup SSL Connection
+	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
+	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
+		//BIO_write(tls_vars->bio_obj,"12345 this is a more complicated message",40);
+		puts("SSL/TLS OK");
+		puts("Connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
+	}
+	else{
+		puts("SSL/TLS ERROR");	
+	}
+	//Load Keypair From Disk
+	EVP_PKEY* pubk_evp = EVP_PKEY_new();
+	EVP_PKEY* priv_evp = EVP_PKEY_new();
+	if(!LoadKeyPair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
+		printf("Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
+		EVP_PKEY_free(pubk_evp);
+		EVP_PKEY_free(priv_evp);
+		CreateKeyPair(PUB_KEY,PRIV_KEY,KEYSIZE);
+		puts("Generated Keypair\nPlease restart the binary to load your keypair");
+		return 0;
+		
+	}
+	else {
+		puts("Loaded Keypair OK");
+		test_keypair(pubk_evp,priv_evp);
+	}
+	//Load SQLITE Database
+	sqlite3 *db = initDB(DB_FNAME);
+	if(db != NULL){
+		puts("Loaded User OK");
+	}
+	else{
+		puts("Loading db ERROR");
+		goto CLEANUP;	
+	}
+	if(DBUserInit(db,PUB_KEY) != 1){
+		puts("Usercheck ERROR");
+		goto CLEANUP;
+	}
+
+				//Sample code for Send/Recv	
+	char msg2test[1024];
+//	char* decbuf;
+	char* encbuf;
+	char* regubuf = (char*)registerUserStr("user",db);
+	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
+	while(1){
+		memset(msg2test,0,sizeof(msg2test));
+		printf("Message to send to \"user\": ");
+		fgets(msg2test,1024,stdin);
+		//sending user
+		encbuf = (char*)encryptmsg("user",(unsigned char*)msg2test,db); //"user" would be the receiving username
+		printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+		BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
+		char* rbuf2 = malloc(4096);
+		BIO_read(tls_vars->bio_obj,rbuf2,4096);
+		puts(rbuf2);
+		//receiving user 
+		//decbuf = (char*)decryptmsg(rbuf2,priv_evp); // decrypt
+//		if(decbuf == NULL) goto CLEANUP;		
+//		printf("Decrypted Message: %s\n",decbuf); 
+	}
+	
+CLEANUP:
+	
+	puts("Cleaning up Objects...");	
+	sqlite3_close(db);
+	EVP_PKEY_free(pubk_evp);
+	EVP_PKEY_free(priv_evp);
+	EVP_cleanup();
+	CRYPTO_cleanup_all_ex_data();
+	ERR_free_strings();
+	BIO_free_all(tls_vars->bio_obj);
+	SSL_CTX_free(tls_vars->ctx);
+	free(tls_vars);
+	tls_vars = NULL;
+	return 1;
+}
+
+
 const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 	if(strlen((const char*)message) > 1024){
 		puts("Message too long(limit 1024)");
@@ -64,7 +161,7 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 		puts("Error Encrypting Message!");
 		return NULL;	
 	}
-
+	binn_object_set_int32(obj,"msgp",MSGSND);
 	binn_object_set_blob(obj,"ek",ek,ekl);
 	binn_object_set_int32(obj,"ekl",ekl);
 	binn_object_set_blob(obj,"enc_buf",enc_buf,enc_len);
@@ -79,6 +176,7 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	return (const char*)final_b64;
 }
 
+	
 const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attempts to decrypt buffer with your private key
 	if(encrypted_buffer == NULL){
 		puts("Error decrypting");
@@ -113,85 +211,34 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attem
 	free(dec_buf);
 	return (const char*)f_buf;
 }
-
-
-int main(void){
-	puts("Starting secure chat application...");
-	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
-	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
-	//Setup SSL Connection
-	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
-	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
-		//BIO_write(tls_vars->bio_obj,"12345 this is a more complicated message",40);
-		puts("SSL/TLS OK");
-		puts("Connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
+	
+const char* registerUserStr(char* username,sqlite3* db){ //returns string you can pass to server to register your user with your public key.
+	int uid = getUserUID(username,db); //get UID for username
+	sqlite3_stmt *stmt;
+	int rsalen;
+	unsigned char *b64buf = NULL;
+	sqlite3_prepare_v2(db,"select rsapub64,rsalen from knownusers where uid=?1",-1,&stmt,NULL);
+	sqlite3_bind_int(stmt,1,uid);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		rsalen = sqlite3_column_int(stmt,1);
+		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
 	}
 	else{
-		puts("SSL/TLS ERROR");	
+		puts("Cannot get userpubkey for registering user.");
+		sqlite3_finalize(stmt);
+		return NULL;
 	}
-	//Load Keypair From Disk
-	EVP_PKEY* pubk_evp = EVP_PKEY_new();
-	EVP_PKEY* priv_evp = EVP_PKEY_new();
-	if(!LoadKeyPair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
-		printf("Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
-		EVP_PKEY_free(pubk_evp);
-		EVP_PKEY_free(priv_evp);
-		CreateKeyPair(PUB_KEY,PRIV_KEY,KEYSIZE);
-		puts("Please restart the binary to load your keypair");
-		return 0;
-		
-	}
-	else {
-		puts("Loaded Keypair OK");
-		test_keypair(pubk_evp,priv_evp);
-	}
-	//Load SQLITE Database
-	sqlite3 *db = initDB(DB_FNAME);
-	if(db != NULL){
-		puts("Loaded User OK");
-	}
-	else{
-		puts("Loading db ERROR");
-		goto CLEANUP;	
-	}
-	if(DBUserInit(db,PUB_KEY) != 1){
-		puts("Usercheck ERROR");
-		goto CLEANUP;
-	}
-
-				//Sample code for Send/Recv	
-	char msg2test[1024];
-	char* decbuf;
-	char* encbuf;
-	while(1){
-		memset(msg2test,0,sizeof(msg2test));
-		printf("Message to send to \"user\": ");
-		fgets(msg2test,1024,stdin);
-		//sending user
-		encbuf = (char*)encryptmsg("user",(unsigned char*)msg2test,db); //"user" would be the receiving username
-		printf("Encrypted message: %s with length: %d\n",encbuf,strlen(encbuf));
-		BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
-		char* rbuf2 = malloc(4096);
-		BIO_read(tls_vars->bio_obj,rbuf2,4096);
-		puts(rbuf2);
-		//receiving user 
-		decbuf = (char*)decryptmsg(rbuf2,priv_evp); // decrypt
-		if(decbuf == NULL) goto CLEANUP;		
-		printf("Decrypted Message: %s\n",decbuf); 
-	}
-	
-CLEANUP:
-	
-	puts("Cleaning up Objects...");	
-	sqlite3_close(db);
-	EVP_PKEY_free(pubk_evp);
-	EVP_PKEY_free(priv_evp);
-	EVP_cleanup();
-	CRYPTO_cleanup_all_ex_data();
-	ERR_free_strings();
-	BIO_free_all(tls_vars->bio_obj);
-	SSL_CTX_free(tls_vars->ctx);
-	free(tls_vars);
-	tls_vars = NULL;
-	return 1;
+	sqlite3_finalize(stmt);	
+	binn* obj;
+	obj = binn_object();
+	binn_object_set_int32(obj,"msgp",REGRSA); //message purpose
+	binn_object_set_str(obj,"b64rsa",(char*)b64buf); //set rsakey
+	binn_object_set_int32(obj,"rsalen",rsalen);
+	binn_object_set_str(obj,"rusername",username);
+	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
+//	free(b64buf);
+	binn_free(obj);
+	return final_b64;
 }
+
+

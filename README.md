@@ -1,11 +1,12 @@
 <h1>SimpleSecureChat</h1>
-A simple program written in C mainly using libOpenSSL for a Simple, yet Secure chat.
+A simple program written mainly in C using libssl for a Simple, yet Secure chat.
 
 <p1 style="text-color:red"> STILL IN DEVELOPMENT </p1>
 
 Requirements:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
-4. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
+2. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
+3. Binn (Data Serialization Library)(Pre included in headers folder) 
 
 <h2> Client </h2>
 

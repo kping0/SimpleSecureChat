@@ -1,4 +1,4 @@
-SimpleSecureChat(Server)
+<h1> SimpleSecureChat(Server) </h1>
 
 Dependencies:
   1. OpenSSL(with development files)

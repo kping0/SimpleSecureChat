@@ -1,4 +1,4 @@
-SimpleSecureChat (Client)
+<h1>SimpleSecureChat (Client)</h1>
 
 To compile, install "make" and run:
 

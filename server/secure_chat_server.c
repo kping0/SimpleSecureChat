@@ -21,8 +21,164 @@
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 
 #define SRVDB "srvdb.db" //Server message database.
+#define MSGSND 1
+#define MSGREC 4
+#define REGRSA 2
+#define GETRSA 3
+
 int sock = 0;
 int gsigflag = 0; //flag so that SIGINT is not handled twice if CTRL-C is hit twice
+
+int checkforUser(char* username,sqlite3* db);
+
+int addUser2DB(char* username,char* b64rsa,int rsalen,sqlite3* db);
+	
+char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
+
+char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
+
+void sig_handler(int sig);
+
+int getUserUID(char* username,sqlite3 *db);
+
+int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message);
+
+sqlite3* initDB(char* dbfname);
+
+int main(void){
+    signal(SIGINT,sig_handler);
+    signal(SIGABRT,sig_handler);
+    signal(SIGFPE,sig_handler);
+    signal(SIGILL,sig_handler);
+    signal(SIGSEGV,sig_handler);
+    signal(SIGTERM,sig_handler);
+    sqlite3* db = initDB(SRVDB); 
+	
+    SSL_CTX *ctx;
+
+    init_openssl();
+    ctx = create_context();
+
+    configure_context(ctx);
+
+    sock = create_socket(5050);
+
+    /* Handle connections */
+    while(1) {
+        struct sockaddr_in addr;
+        uint len = sizeof(addr);
+     	
+	
+        int client = accept(sock, (struct sockaddr*)&addr, &len);
+	printf("Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
+	pid_t pid = fork();
+	if(pid == 0){ //Start of forked(STARTOF Session Handler)
+        if (client < 0) {
+            perror("Unable to accept");
+            exit(EXIT_FAILURE);
+        }
+ 	SSL *ssl;
+	ssl = SSL_new(ctx);
+        SSL_set_fd(ssl, client);
+	
+        BIO *accept_bio = BIO_new_socket(client, BIO_CLOSE);
+        SSL_set_bio(ssl, accept_bio, accept_bio);
+        
+        SSL_accept(ssl);
+        
+        ERR_print_errors_fp(stderr);
+        
+        BIO *bio = BIO_pop(accept_bio);
+	while(1){	
+		char buf[4096];
+		memset(buf,'\0',4096);
+        	int r = SSL_read(ssl,buf, 4096); 
+            	switch (SSL_get_error(ssl, r))
+            	{ 
+            	case SSL_ERROR_NONE: 
+               		 break;
+            	case SSL_ERROR_ZERO_RETURN: 
+                	goto end; 
+            	default: 
+                	goto end;
+            	}
+		buf[4095] = '\0';
+		SSL_write(ssl,buf,4095);
+		binn* obj = binn_open(base64decode(buf,strlen(buf)));
+		if(obj == NULL) goto end;
+		int msgp = binn_object_int32(obj,"msgp");
+		if(msgp == MSGSND){
+			char* recipient = NULL;
+			recipient = binn_object_str(obj,"recipient");
+			if(recipient == NULL)goto end;
+			printf("Buffering message from %s to %s\n",binn_object_str(obj,"sender"),recipient);
+			if(AddMSG2DB(db,recipient,(unsigned char*)buf) == -1){
+				puts("Error Adding MSG to DB");
+			}
+		}
+		else if(msgp == REGRSA){
+			char* rusername = binn_object_str(obj,"rusername");
+			if(checkforUser(rusername,db) == 1){
+//				SSL_write(ssl,"USRTKN",6); //Send USRTKN if user is taken
+				puts("Cannot add user: username already taken.");
+			}
+			else{
+				puts("inserting user into db");
+				char* b64rsa = binn_object_str(obj,"b64rsa");
+				int rsalen = binn_object_int32(obj,"rsalen");
+				if(addUser2DB(rusername,b64rsa,rsalen,db) != 1){
+					puts("error inserting user");
+				}
+			}
+		}
+
+		sleep(1);
+		binn_free(obj);
+	}
+end:
+	puts("Ending Client Session");
+	BIO_free(bio);
+        SSL_free(ssl);
+        close(client);
+	exit(0);
+	} //end of forked
+    } //End of while loop (ENDOF Session Handler)
+
+    close(sock);
+    SSL_CTX_free(ctx);
+    cleanup_openssl();
+    return 0;
+}
+int checkforUser(char* username,sqlite3* db){
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,"select uid from knownusers where username = ?1",-1,&stmt,0);
+	sqlite3_bind_text(stmt,1,username,-1,0);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		sqlite3_finalize(stmt);
+		return 1;	
+	}
+	else{
+		sqlite3_finalize(stmt);
+		return 0;
+	}	
+}
+int addUser2DB(char* username,char* b64rsa,int rsalen,sqlite3* db){
+	printf("Trying to add user: %s,b64rsa is %s, w len of %i\n",username,b64rsa,rsalen);
+	sqlite3_stmt* stmt;
+	char* sql = "insert into knownusers(uid,username,rsapub64,rsalen)  values(NULL,?1,?2,?3);";
+	sqlite3_prepare_v2(db,sql,-1,&stmt,0);
+	sqlite3_bind_text(stmt,1,username,-1,0);
+	sqlite3_bind_text(stmt,2,b64rsa,-1,0);
+	sqlite3_bind_int(stmt,3,rsalen);
+	if(sqlite3_step(stmt) != SQLITE_DONE){
+		puts("error in sql statement exec");
+		return 0;
+	}
+	sqlite3_finalize(stmt);
+	return 1;	
+
+}
+	
 char *base64encode (const void *b64_encode_this, int encode_this_many_bytes){
     BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
     BUF_MEM *mem_bio_mem_ptr;    //Pointer to a "memory BIO" structure holding our base64 data.
@@ -80,6 +236,7 @@ void sig_handler(int sig){
 		exit(EXIT_FAILURE);	
 	}}
 }
+
 int getUserUID(char* username,sqlite3 *db){ //gets uid from user (to add a message to db for ex.)
         int uid = -1; //default is error        
         sqlite3_stmt *stmt;
@@ -144,88 +301,4 @@ sqlite3* initDB(char* dbfname){
 	return db;
 }
 
-int main(void){
-    signal(SIGINT,sig_handler);
-    signal(SIGABRT,sig_handler);
-    signal(SIGFPE,sig_handler);
-    signal(SIGILL,sig_handler);
-    signal(SIGSEGV,sig_handler);
-    signal(SIGTERM,sig_handler);
-	sqlite3* db = initDB(SRVDB); 
-	
-    SSL_CTX *ctx;
 
-    init_openssl();
-    ctx = create_context();
-
-    configure_context(ctx);
-
-    sock = create_socket(5050);
-
-    /* Handle connections */
-    while(1) {
-        struct sockaddr_in addr;
-        uint len = sizeof(addr);
-     	
-	
-        int client = accept(sock, (struct sockaddr*)&addr, &len);
-	printf("Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
-	pid_t pid = fork();
-	if(pid == 0){ //Start of forked(STARTOF Session Handler)
-        if (client < 0) {
-            perror("Unable to accept");
-            exit(EXIT_FAILURE);
-        }
- 	SSL *ssl;
-	ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, client);
-	
-        BIO *accept_bio = BIO_new_socket(client, BIO_CLOSE);
-        SSL_set_bio(ssl, accept_bio, accept_bio);
-        
-        SSL_accept(ssl);
-        
-        ERR_print_errors_fp(stderr);
-        
-        BIO *bio = BIO_pop(accept_bio);
-	while(1){	
-		char buf[4096];
-		memset(buf,'\0',4096);
-        	int r = SSL_read(ssl,buf, 4096); 
-            	switch (SSL_get_error(ssl, r))
-            	{ 
-            	case SSL_ERROR_NONE: 
-               		 break;
-            	case SSL_ERROR_ZERO_RETURN: 
-                	goto end; 
-            	default: 
-                	goto end;
-            	}
-		buf[4095] = '\0';
-		SSL_write(ssl,buf,4095);
-		binn* obj = binn_open(base64decode(buf,strlen(buf)));
-		if(obj == NULL) goto end;
-		char* recipient ;
-		recipient = binn_object_str(obj,"recipient");
-		if(strlen(recipient) <= 0) goto end;
-		printf("Buffering message from %s to %s\n",binn_object_str(obj,"sender"),recipient);
-		if(AddMSG2DB(db,recipient,(unsigned char*)buf) == -1){
-			puts("Error Adding MSG to DB");
-		}
-		sleep(1);
-		binn_free(obj);
-	}
-end:
-	puts("Ending Client Session");
-	BIO_free(bio);
-        SSL_free(ssl);
-        close(client);
-	exit(0);
-	} //end of forked
-    } //End of while loop (ENDOF Session Handler)
-
-    close(sock);
-    SSL_CTX_free(ctx);
-    cleanup_openssl();
-    return 0;
-}

@@ -41,7 +41,7 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	obj = binn_object();	
 	EVP_PKEY * userpubk = get_pubk_username(username,db);
 	sqlite3_stmt *stmt;
-	binn_object_set_str(obj,"receiver",username);
+	binn_object_set_str(obj,"recipient",username);
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
 	if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
 		binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
@@ -160,19 +160,22 @@ int main(void){
 	}
 
 				//Sample code for Send/Recv	
-	char msg2test[200];
+	char msg2test[1024];
 	char* decbuf;
 	char* encbuf;
 	while(1){
 		memset(msg2test,0,sizeof(msg2test));
 		printf("Message to send to \"user\": ");
-		fgets(msg2test,200,stdin);
+		fgets(msg2test,1024,stdin);
 		//sending user
 		encbuf = (char*)encryptmsg("user",(unsigned char*)msg2test,db); //"user" would be the receiving username
-		printf("Encrypted message: %s\n",encbuf);
-
+		printf("Encrypted message: %s with length: %d\n",encbuf,strlen(encbuf));
+		BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
+		char* rbuf2 = malloc(4096);
+		BIO_read(tls_vars->bio_obj,rbuf2,4096);
+		puts(rbuf2);
 		//receiving user 
-		decbuf = (char*)decryptmsg(encbuf,priv_evp); // decrypt
+		decbuf = (char*)decryptmsg(rbuf2,priv_evp); // decrypt
 		if(decbuf == NULL) goto CLEANUP;		
 		printf("Decrypted Message: %s\n",decbuf); 
 	}

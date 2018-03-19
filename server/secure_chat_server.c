@@ -21,10 +21,12 @@
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 
 #define SRVDB "srvdb.db" //Server message database.
-#define MSGSND 1
-#define MSGREC 4
-#define REGRSA 2
-#define GETRSA 3
+
+//Message Purposes
+#define MSGSND 1 //Message Send(normal message)
+#define REGRSA 2 //Register user in association with an rsa public key
+#define GETRSA 3 //Get user public key from server
+#define MSGREC 4 //Get new messages
 
 int sock = 0;
 int gsigflag = 0; //flag so that SIGINT is not handled twice if CTRL-C is hit twice

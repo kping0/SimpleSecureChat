@@ -1,7 +1,7 @@
 <h1>SimpleSecureChat</h1>
-A simple program written mainly in C using libssl for a Simple, yet Secure chat.
+A simple program written mainly in C using libssl for a Simple and Secure chat.
 
-<p1 style="text-color:red"> STILL IN DEVELOPMENT </p1>
+STILL IN DEVELOPMENT
 
 Dependencies:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
@@ -26,3 +26,5 @@ Command to Create Server Certificate
 
     server# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 
 
+NOTE:
+    for some beta ciients, the server needs to be running otherwise it segfaults(beta);

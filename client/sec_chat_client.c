@@ -187,54 +187,6 @@ int main(void){
 		};
 		
 	}
-//Getting Messages From Server Example:
-/*
-		char* buf = (char*)ServerGetMessages(db);
-		BIO_write(tls_vars->bio_obj,buf,strlen(buf));
-		char recvbuf[200000];
-		BIO_read(tls_vars->bio_obj,recvbuf,200000);
-		puts(recvbuf);
-		binn *list;
-		list = binn_open(base64decode(recvbuf,strlen(recvbuf)));
-		int lc = binn_count(list);
-		int i;
-		for(i=1;i<=lc;i++){
-			puts(binn_list_str(list,i));
-		}
-*/
-
-//Getting User RSA key and adding it to knownusers example
-/*	
-	char msg2test[1024];
-	while(1){
-		memset(msg2test,0,sizeof(msg2test));
-		puts("Username for public key to get:");
-		fgets(msg2test,1024,stdin);
-			
-		const char* gtrsa64 = ServerGetUserRSA(msg2test);		
-		BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
-		char recvbuf[4096];
-		memset(recvbuf,'\0',4096);
-		BIO_read(tls_vars->bio_obj,recvbuf,4096);
-		if(strcmp(recvbuf,"GETRSA_RSP_ERROR") == 0){
-			puts(recvbuf);
-		} 
-		else{
-			sqlite3_stmt* stmt;
-			binn* obj;
-			obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
-			char* rsapub64 = binn_object_str(obj,"b64rsa");
-			int rsalen = binn_object_int32(obj,"rsalen");
-			sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
-			sqlite3_bind_text(stmt,1,msg2test,-1,0);
-			sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
-			sqlite3_bind_int(stmt,3,rsalen);
-			sqlite3_step(stmt);
-			sqlite3_finalize(stmt);
-			binn_free(obj);
-		}
-	}*/
-	
 CLEANUP:
 	
 	puts("Cleaning up Objects...");	
@@ -392,7 +344,7 @@ int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db){ //adds user+pubke
 	binn_free(obj);
 	return 0;
 }
-const char* ServerGetMessages(sqlite3* db){
+const char* ServerGetMessages(sqlite3* db){ //Creates request(doesnt send it) for new messages
 	char* username = getMUSER(db);
 	binn* obj;
 	obj = binn_object();
@@ -403,7 +355,7 @@ const char* ServerGetMessages(sqlite3* db){
 	binn_free(obj);
 	return msg2srv64;
 }
-char* getMUSER(sqlite3* db){
+char* getMUSER(sqlite3* db){ //Get your username
 	sqlite3_stmt* stmt;
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
 	char* muser = NULL;

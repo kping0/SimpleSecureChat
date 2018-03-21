@@ -107,6 +107,8 @@ void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db){ // adds user to D
 
 int getUserUID(char* username,sqlite3 *db){ //gets uid from user (to add a message to db for ex.)
 	int uid = -1; //default is error	
+	char *newline = strchr(username,'\n');
+	if ( newline ) *newline = 0;
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,"select uid from knownusers where username = ?1",-1,&stmt,NULL);
 	sqlite3_bind_text(stmt,1,username,-1,0);

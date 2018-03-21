@@ -29,7 +29,7 @@
 #define HOST_CERT "public.pem" // Server public certificate (X509 Public Cert)
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
-#define KEYSIZE 8192 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
+#define KEYSIZE 1024 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename
 
 //Message Purposes
@@ -37,14 +37,26 @@
 #define REGRSA 2 //Register user in association with an rsa public key
 #define GETRSA 3 //Get user public key from server
 #define MSGREC 4 //Get new messages
-
+//Server responses to the above.
+#define MSGSND_RSP 5  
+#define MSGREC_RSP 6
+#define REGRSA_RSP 7
+#define GETRSA_RSP 8
 //Prototype functions
 const char* encryptmsg(char* username,unsigned char* message,sqlite3* db); //encrypt buffer message with a public key fetched (index username) from the sqlite3 db (returns encryped buffer)
 
 const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey); // Attempts to decrypt buffer with your private key
 
 const char* registerUserStr(char* username,sqlite3* db); //returns string you can pass to server to register your user with your public key.
+
+const char* ServerGetUserRSA(char* username);
+
+int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db); //add user+pubkey combo from base64binn object
+
+const char* ServerGetMessages(sqlite3* db); //Returns string that the server will interpret to send you your messages.
 	
+char* getMUSER(sqlite3* db); //Returns Username that has the uid=1 (your username)
+
 int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
@@ -88,29 +100,140 @@ int main(void){
 		puts("Usercheck ERROR");
 		goto CLEANUP;
 	}
+	char* yourusername = getMUSER(db);
+	printf("Your username is: %s, trying to register it with the server\n",yourusername);
+	char* regubuf = (char*)registerUserStr(yourusername,db);
+	if(regubuf != NULL)BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
 
-				//Sample code for Send/Recv	
 	char msg2test[1024];
-//	char* decbuf;
+	char* decbuf;
 	char* encbuf;
-	char* regubuf = (char*)registerUserStr("user",db);
-	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
+//
+//
+// This is a very Quickly written approch to UI.
+// There is ALOT of room for improvement.
+//
+	while(1){ //to be replaced by GUI
+		puts("Options:Send message(1),AddUser(2),Get your messages(3)");
+		int  options;
+		options = fgetc(stdin);
+		while(fgetc(stdin) != '\n'){}
+		switch( options ){
+			case '1':
+				memset(msg2test,0,sizeof(msg2test));
+				printf("recipient name: ");
+				char runm[1024];
+				fgets(runm,1024,stdin);
+				puts("Message to user:");
+				fgets(msg2test,1024,stdin);
+				//sending user
+				encbuf = (char*)encryptmsg(runm,(unsigned char*)msg2test,db); //"user" would be the receiving username
+				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
+				break;
+			case '2':
+				memset(msg2test,0,sizeof(msg2test));
+				puts("Username for public key to get:");
+				fgets(msg2test,1024,stdin);
+			
+				const char* gtrsa64 = ServerGetUserRSA(msg2test);		
+				puts(gtrsa64);
+				BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
+				char recvbuf[4096];
+				memset(recvbuf,'\0',4096);
+				BIO_read(tls_vars->bio_obj,recvbuf,4096);
+				if(strcmp(recvbuf,"GETRSA_RSP_ERROR") == 0){
+					puts(recvbuf);
+				} 
+				else{
+					sqlite3_stmt* stmt;
+					binn* obj;
+					obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
+					char* rsapub64 = binn_object_str(obj,"b64rsa");
+					int rsalen = binn_object_int32(obj,"rsalen");
+					sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
+					sqlite3_bind_text(stmt,1,msg2test,-1,0);
+					sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
+					sqlite3_bind_int(stmt,3,rsalen);
+					sqlite3_step(stmt);
+					sqlite3_finalize(stmt);
+					binn_free(obj);
+			
+
+}	break;
+			case '3':
+				char* buf = (char*)ServerGetMessages(db);
+				BIO_write(tls_vars->bio_obj,buf,strlen(buf));
+				char recvbuf2[200000];
+				BIO_read(tls_vars->bio_obj,recvbuf2,200000);
+				binn *list;
+				list = binn_open(base64decode(recvbuf2,strlen(recvbuf2)));
+				int lc = binn_count(list);
+				int i;
+				for(i=1;i<=lc;i++){
+					binn *obj2 = binn_open(base64decode(binn_list_str(list,i),strlen(binn_list_str(list,i))));
+					char* sender = binn_object_str(obj2,"sender");	
+					decbuf = (char*)decryptmsg(binn_list_str(list,i),priv_evp); // decrypt
+					if(decbuf == NULL) goto CLEANUP;		
+					printf("Decrypted Message from %s: %s\n",sender,decbuf); 
+					binn_free(obj2);
+					obj2 = NULL;
+				}
+				binn_free(list);
+				list = NULL;
+				break;
+			default:
+				break;
+		};
+		
+	}
+//Getting Messages From Server Example:
+/*
+		char* buf = (char*)ServerGetMessages(db);
+		BIO_write(tls_vars->bio_obj,buf,strlen(buf));
+		char recvbuf[200000];
+		BIO_read(tls_vars->bio_obj,recvbuf,200000);
+		puts(recvbuf);
+		binn *list;
+		list = binn_open(base64decode(recvbuf,strlen(recvbuf)));
+		int lc = binn_count(list);
+		int i;
+		for(i=1;i<=lc;i++){
+			puts(binn_list_str(list,i));
+		}
+*/
+
+//Getting User RSA key and adding it to knownusers example
+/*	
+	char msg2test[1024];
 	while(1){
 		memset(msg2test,0,sizeof(msg2test));
-		printf("Message to send to \"user\": ");
+		puts("Username for public key to get:");
 		fgets(msg2test,1024,stdin);
-		//sending user
-		encbuf = (char*)encryptmsg("user",(unsigned char*)msg2test,db); //"user" would be the receiving username
-		printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
-		BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
-		char* rbuf2 = malloc(4096);
-		BIO_read(tls_vars->bio_obj,rbuf2,4096);
-		puts(rbuf2);
-		//receiving user 
-		//decbuf = (char*)decryptmsg(rbuf2,priv_evp); // decrypt
-//		if(decbuf == NULL) goto CLEANUP;		
-//		printf("Decrypted Message: %s\n",decbuf); 
-	}
+			
+		const char* gtrsa64 = ServerGetUserRSA(msg2test);		
+		BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
+		char recvbuf[4096];
+		memset(recvbuf,'\0',4096);
+		BIO_read(tls_vars->bio_obj,recvbuf,4096);
+		if(strcmp(recvbuf,"GETRSA_RSP_ERROR") == 0){
+			puts(recvbuf);
+		} 
+		else{
+			sqlite3_stmt* stmt;
+			binn* obj;
+			obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
+			char* rsapub64 = binn_object_str(obj,"b64rsa");
+			int rsalen = binn_object_int32(obj,"rsalen");
+			sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
+			sqlite3_bind_text(stmt,1,msg2test,-1,0);
+			sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
+			sqlite3_bind_int(stmt,3,rsalen);
+			sqlite3_step(stmt);
+			sqlite3_finalize(stmt);
+			binn_free(obj);
+		}
+	}*/
 	
 CLEANUP:
 	
@@ -213,7 +336,9 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attem
 }
 	
 const char* registerUserStr(char* username,sqlite3* db){ //returns string you can pass to server to register your user with your public key.
-	int uid = getUserUID(username,db); //get UID for username
+	char username2[1024];
+	sprintf(username2,"%s",username); //Stupid Way to add a '\0'(Null termination) to the username
+	int uid = getUserUID(username2,db); //get UID for username
 	sqlite3_stmt *stmt;
 	int rsalen;
 	unsigned char *b64buf = NULL;
@@ -234,11 +359,58 @@ const char* registerUserStr(char* username,sqlite3* db){ //returns string you ca
 	binn_object_set_int32(obj,"msgp",REGRSA); //message purpose
 	binn_object_set_str(obj,"b64rsa",(char*)b64buf); //set rsakey
 	binn_object_set_int32(obj,"rsalen",rsalen);
-	binn_object_set_str(obj,"rusername",username);
+	binn_object_set_str(obj,"rusername",(char*)getMUSER(db));
 	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
-//	free(b64buf);
 	binn_free(obj);
 	return final_b64;
 }
 
+const char* ServerGetUserRSA(char* username){
+	binn* obj;
+	obj = binn_object();
+	char* newline = strchr(username,'\n');
+	if(newline)*newline=0;
+	binn_object_set_int32(obj,"msgp",GETRSA);
+	binn_object_set_str(obj,"username",username);
+	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
+	binn_free(obj);
+	return final_b64;		
+}
+
+int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db){ //adds user+pubkey to knownusers 
+	sqlite3_stmt* stmt;
+	binn* obj;
+	obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
+	char* rsapub64 = binn_object_str(obj,"b64rsa");
+	int rsalen = binn_object_int32(obj,"rsalen");
+	sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
+	sqlite3_bind_text(stmt,1,username,-1,0);
+	sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
+	sqlite3_bind_int(stmt,3,rsalen);
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+	binn_free(obj);
+	return 0;
+}
+const char* ServerGetMessages(sqlite3* db){
+	char* username = getMUSER(db);
+	binn* obj;
+	obj = binn_object();
+	binn_object_set_int32(obj,"msgp",MSGREC);
+	binn_object_set_str(obj,"username",username);
+	//binn_object_set_str(obj,"authkey",authkey); //will in the future be used(registered with the name), sha256 and stored in server db.
+	const char* msg2srv64 = base64encode(binn_ptr(obj),binn_size(obj));
+	binn_free(obj);
+	return msg2srv64;
+}
+char* getMUSER(sqlite3* db){
+	sqlite3_stmt* stmt;
+	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
+	char* muser = NULL;
+	if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
+		 muser = (char*)sqlite3_column_text(stmt,0);
+	}
+	sqlite3_finalize(stmt);
+	return muser;
+}
 

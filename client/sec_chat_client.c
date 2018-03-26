@@ -29,7 +29,7 @@
 #define HOST_CERT "public.pem" // Server public certificate (X509 Public Cert)
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
-#define KEYSIZE 1024 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
+#define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename
 
 //Message Purposes
@@ -118,8 +118,8 @@ int main(void){
 		int  options;
 		options = fgetc(stdin);
 		while(fgetc(stdin) != '\n'){}
-		switch( options ){
-			case '1':
+		switch(options){
+			case '1': //If User wants to send a message do:
 				memset(msg2test,0,sizeof(msg2test));
 				printf("recipient name: ");
 				char runm[1024];
@@ -131,7 +131,8 @@ int main(void){
 				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
 				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
 				break;
-			case '2':
+
+			case '2': //If User wants to add another user do:
 				memset(msg2test,0,sizeof(msg2test));
 				puts("Username for public key to get:");
 				fgets(msg2test,1024,stdin);
@@ -158,10 +159,11 @@ int main(void){
 					sqlite3_step(stmt);
 					sqlite3_finalize(stmt);
 					binn_free(obj);
-			
+				}
+				break;
 
-}	break;
-			case '3':
+			case '3': //If User wants to receive messages do:
+				puts("Getting Messages from Server...");
 				char* buf = (char*)ServerGetMessages(db);
 				BIO_write(tls_vars->bio_obj,buf,strlen(buf));
 				char recvbuf2[200000];
@@ -182,7 +184,7 @@ int main(void){
 				binn_free(list);
 				list = NULL;
 				break;
-			default:
+		default: //Do nothing..
 				break;
 		};
 		
@@ -317,7 +319,7 @@ const char* registerUserStr(char* username,sqlite3* db){ //returns string you ca
 	return final_b64;
 }
 
-const char* ServerGetUserRSA(char* username){
+const char* ServerGetUserRSA(char* username){ //Generates a character array that can be sent the message buffer server to request a userpublickey
 	binn* obj;
 	obj = binn_object();
 	char* newline = strchr(username,'\n');
@@ -329,7 +331,7 @@ const char* ServerGetUserRSA(char* username){
 	return final_b64;		
 }
 
-int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db){ //adds user+pubkey to knownusers 
+int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db){ //adds user+pubkey to knownusers database (needs to be done before sending a message)
 	sqlite3_stmt* stmt;
 	binn* obj;
 	obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
@@ -344,7 +346,7 @@ int addUser2DB_binn(char* recvbuf,char* username,sqlite3* db){ //adds user+pubke
 	binn_free(obj);
 	return 0;
 }
-const char* ServerGetMessages(sqlite3* db){ //Creates request(doesnt send it) for new messages
+const char* ServerGetMessages(sqlite3* db){ //Generates a character array that can be sent to message buffer server to receive back your stored encrypted message
 	char* username = getMUSER(db);
 	binn* obj;
 	obj = binn_object();
@@ -355,14 +357,13 @@ const char* ServerGetMessages(sqlite3* db){ //Creates request(doesnt send it) fo
 	binn_free(obj);
 	return msg2srv64;
 }
-char* getMUSER(sqlite3* db){ //Get your username
+char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 1)
 	sqlite3_stmt* stmt;
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
 	char* muser = NULL;
-	if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
+	if(sqlite3_step(stmt) == SQLITE_ROW){ 
 		 muser = (char*)sqlite3_column_text(stmt,0);
 	}
 	sqlite3_finalize(stmt);
 	return muser;
 }
-

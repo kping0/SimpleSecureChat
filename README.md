@@ -1,6 +1,5 @@
 <h1>SimpleSecureChat</h1>
-A simple program written mainly in C using libssl for a Simple and Secure chat.
-
+ Simple & Secure e2e encrypted messaging application written in C.
 STILL IN DEVELOPMENT
 
 Dependencies:

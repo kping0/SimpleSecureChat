@@ -23,7 +23,7 @@ char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
 
 sqlite3* initDB(char* dbfname);
 
-void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db);
+void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db,char* authkey);
 
 int getUserUID(char* username,sqlite3 *db);
 

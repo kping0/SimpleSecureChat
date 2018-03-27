@@ -1,6 +1,8 @@
 <h1>SimpleSecureChat</h1>
+
  Simple & Secure e2e encrypted messaging application written in C.
-STILL IN DEVELOPMENT
+ 
+ STILL IN DEVELOPMENT
 
 Dependencies:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 

@@ -54,24 +54,24 @@ sqlite3* initDB(char* dbfname){
 	sqlite3 *db;
 	sqlite3_stmt *stmt;
 	int rc = sqlite3_open(dbfname,&db);
-	char *errm = 0;
 	if(rc){ 
-		sqlite3_free(errm);
 		return NULL;
 	}
 	char* sql = "CREATE TABLE MESSAGES(MSGID INTEGER PRIMARY KEY,UID INT NOT NULL,UID2 INT NOT NULL,MESSAGE TEXT NOT NULL);"; //table where msgid(msgid),uid is sender(can be you),uid2 is recipient (can be you)
-	sqlite3_exec(db,sql,NULL,0,&errm);
+	sqlite3_exec(db,sql,NULL,0,NULL);
 
-	sql = "CREATE TABLE KNOWNUSERS(UID INTEGER PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INTEGER NOT NULL);"; //list of known users and public keys associated with the users
-	sqlite3_exec(db,sql,NULL,0,&errm);
+	sql = "CREATE TABLE KNOWNUSERS(UID INTEGER PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INTEGER NOT NULL,AUTHKEY TEXT);"; //list of known users and public keys associated with the users
+	sqlite3_exec(db,sql,NULL,0,NULL);
+	
+	sql = "CREATE TABLE SETTINGS(SID INTEGER PRIMARY KEY,SNAME TEXT NOT NULL,SVAL INTEGER NOT NULL);";
+	sqlite3_exec(db,sql,NULL,0,NULL);
 
 	sql = "insert into messages(msgid,uid,uid2,message)values(0,0,0,'testmessage');";
-	sqlite3_exec(db,sql,NULL,0,&errm);
+	sqlite3_exec(db,sql,NULL,0,NULL);
 	
 	sql = "insert into knownusers(uid,username,rsapub64,rsalen) values(0,'testuser','testuser',0);";
-	sqlite3_exec(db,sql,NULL,0,&errm);
+	sqlite3_exec(db,sql,NULL,0,NULL);
 	
-	sqlite3_free(errm);
 	sql = NULL;
 	sqlite3_prepare_v2(db,"select * from messages where msgid=0",-1,&stmt,NULL);
 	if(sqlite3_step(stmt) == SQLITE_ROW){
@@ -85,7 +85,7 @@ sqlite3* initDB(char* dbfname){
 	return db;
 }
 
-void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db){ // adds user to DB
+void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db,char* authkey){ // adds user to DB
 	unsigned char *buf,*b64buf;
 	int len;
 	sqlite3_stmt *stmt;
@@ -95,10 +95,11 @@ void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db){ // adds user to D
 	len = i2d_RSAPublicKey(userpubkey, &buf);
 	if (len < 0) return;
 	b64buf = (unsigned char*)base64encode(buf,len);
-	sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
+	sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen,authkey)values(NULL,?1,?2,?3,?4);",-1,&stmt,NULL);
 	sqlite3_bind_text(stmt,1,username,-1,0);
 	sqlite3_bind_text(stmt,2,(const char*)b64buf,-1,0);
 	sqlite3_bind_int(stmt,3,len);
+	if(authkey != NULL)sqlite3_bind_text(stmt,4,(const char*)authkey,-1,0);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 	stmt = NULL;
@@ -154,7 +155,16 @@ int DBUserInit(sqlite3 *db,char* pkeyfn){ //check for own user & create if not f
 		}
 		RSA* rsa_pubk = RSA_new();
 		PEM_read_bio_RSAPublicKey(rsa_pub_bio,&rsa_pubk,NULL,NULL);
-		(void)addKnownUser(username,rsa_pubk,db);
+		unsigned char* authkey = malloc(128);
+		RAND_poll();
+		if(RAND_bytes(authkey,128) != 1){
+			puts("Generating authkey ERROR");
+			return 0;
+		}
+		char* b64authkey = base64encode(authkey,128);
+		(void)addKnownUser(username,rsa_pubk,db,b64authkey);
+		free(authkey);
+		free(b64authkey);
 	}
 	return 1;
 }

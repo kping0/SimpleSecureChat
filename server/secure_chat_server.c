@@ -32,13 +32,16 @@
 #define MSGREC_RSP 6 //Server response to MSGREC
 #define REGRSA_RSP 7 //Server response to REGRSA
 #define GETRSA_RSP 8 //Server response to GETRSA
-int sock = 0; //Bad workaround but basically so that if a signal is received the socket can be closed
+
+#define AUTHUSR 9 //Sent from client to authenticate
+
+int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 volatile int gsigflag = 0; //flag so that SIGINT is not handled twice if CTRL-C is hit twice
 
 int checkforUser(char* username,sqlite3* db); 
 
-int addUser2DB(char* username,char* b64rsa,int rsalen,sqlite3* db);
+int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db);
 	
 char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
 
@@ -153,7 +156,8 @@ int main(void){
 				puts("inserting user into db");
 				char* b64rsa = binn_object_str(obj,"b64rsa");
 				int rsalen = binn_object_int32(obj,"rsalen");
-				if(addUser2DB(rusername,b64rsa,rsalen,db) != 1){
+				char* authkey = binn_object_str(obj,"authkey");
+				if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
 					puts("error inserting user");
 				}
 			}
@@ -172,8 +176,9 @@ int main(void){
 			if(retmsg != NULL) SSL_write(ssl,retmsg,strlen(retmsg));
 			//call function that returns an int,(messages available)send it to the client,and then send i messages to client in while() loop. 
 		}
-
-		sleep(1);
+		else if(msgp == AUTHUSR){ //User wants to authenticate so he can receive messages.
+			puts("User wants to authenticate.");
+		}
 		binn_free(obj);
 	}
 end: //Commands to run before exit & then exit
@@ -208,14 +213,15 @@ int checkforUser(char* username,sqlite3* db){ //Check if user exists in database
 		return 0;
 	}	
 }
-int addUser2DB(char* username,char* b64rsa,int rsalen,sqlite3* db){ //Add User to database, returns 1 on success,0 on error
-	printf("Trying to add user: %s,b64rsa is %s, w len of %i\n",username,b64rsa,rsalen);
+int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db){ //Add User to database, returns 1 on success,0 on error
+	printf("Trying to add user: %s,b64rsa is %s, w len of %i, authkey is %s\n",username,b64rsa,rsalen,authkey);
 	sqlite3_stmt* stmt;
-	char* sql = "insert into knownusers(uid,username,rsapub64,rsalen)  values(NULL,?1,?2,?3);";
+	char* sql = "insert into knownusers(uid,username,rsapub64,rsalen,authkey)  values(NULL,?1,?2,?3,?4);";
 	sqlite3_prepare_v2(db,sql,-1,&stmt,0);
 	sqlite3_bind_text(stmt,1,username,-1,0);
 	sqlite3_bind_text(stmt,2,b64rsa,-1,0);
 	sqlite3_bind_int(stmt,3,rsalen);
+	sqlite3_bind_text(stmt,4,authkey,-1,0);
 	if(sqlite3_step(stmt) != SQLITE_DONE){
 		puts("error in sql statement exec");
 		return 0;
@@ -265,7 +271,6 @@ void sig_handler(int sig){ //Function to handle signals
 		gsigflag = 1;
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
 			printf("\nCaught Signal... Exiting\n");
-			cleanup_openssl();
 			if(sock != 0){
 				close(sock);
 				sock = 0;
@@ -325,7 +330,7 @@ sqlite3* initDB(char* dbfname){ //Initalize the Mysql Database and create the ta
 	char* sql = "CREATE TABLE MESSAGES(MSGID INTEGER PRIMARY KEY,RECVUID INTEGER NOT NULL,MESSAGE TEXT NOT NULL);"; // table for messages 
 	sqlite3_exec(db,sql,NULL,0,&errm);
 
-	sql = "CREATE TABLE KNOWNUSERS(UID INTEGER PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INTEGER NOT NULL);"; //list of known users and public keys associated with the users
+	sql = "CREATE TABLE KNOWNUSERS(UID INTEGER PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INTEGER NOT NULL,AUTHKEY TEXT);"; //list of known users and public keys associated with the users
 	sqlite3_exec(db,sql,NULL,0,&errm);
 
 	sql = "insert into messages(msgid,recvuid,message)values(0,0,'testmessage');";
@@ -395,4 +400,5 @@ void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills al
 	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
 	errno = saved_errno;
 }
+
 

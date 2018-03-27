@@ -44,12 +44,13 @@
 #define REGRSA_RSP 7
 #define GETRSA_RSP 8
 
+#define AUTHUSR 9 //Purpose of message is to authenticate to the server.
 //Prototype functions
 const char* encryptmsg(char* username,unsigned char* message,sqlite3* db); //encrypt buffer message with a public key fetched (index username) from the sqlite3 db (returns encryped buffer)
 
 const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey); // Attempts to decrypt buffer with your private key
 
-const char* registerUserStr(char* username,sqlite3* db); //returns string you can pass to server to register your user with your public key.
+const char* registerUserStr(sqlite3* db); //returns string you can pass to server to register your user with your public key.
 
 const char* ServerGetUserRSA(char* username);
 
@@ -102,15 +103,17 @@ int main(void){
 	}
 	char* yourusername = getMUSER(db);
 	printf("Your username is: %s, trying to register it with the server\n",yourusername);
-	char* regubuf = (char*)registerUserStr(yourusername,db);
+	char* regubuf = (char*)registerUserStr(db);
 	if(regubuf != NULL)BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
 
 	char msg2test[1024];
 	char* decbuf;
 	char* encbuf;
 //
-// This is a very Quickly written approch to UI.
+// This is a very Quickly written UI.
 //
+
+	while(fgetc(stdin) != '\n'){}
 	while(1){ //to be replaced by GUI
 		puts("Options: Send message(1),AddUser(2),Get messages(3)");
 		int options;
@@ -287,19 +290,17 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attem
 	return (const char*)f_buf;
 }
 	
-const char* registerUserStr(char* username,sqlite3* db){ //returns string you can pass to server to register your user with your public key.
-	char username_local[1024];
-	memcpy(username_local,username,1022); //Copy passed username to stack variable
-	username_local[1023] = '\0'; //Add NULL termination
-	int uid = getUserUID(username_local,db); //get UID for username
+const char* registerUserStr(sqlite3* db){ //returns string you can pass to server to register your user with your public key.
+
 	sqlite3_stmt *stmt;
 	int rsalen;
 	unsigned char *b64buf = NULL;
-	sqlite3_prepare_v2(db,"select rsapub64,rsalen from knownusers where uid=?1",-1,&stmt,NULL);
-	sqlite3_bind_int(stmt,1,uid);
+	unsigned char* authkey = NULL;
+	sqlite3_prepare_v2(db,"select rsapub64,rsalen,authkey from knownusers where uid=1",-1,&stmt,NULL);
 	if(sqlite3_step(stmt) == SQLITE_ROW){ //Get B64 Public Key for local user
 		rsalen = sqlite3_column_int(stmt,1);
 		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
+		authkey = (unsigned char*)sqlite3_column_text(stmt,2); //get authkey 
 	}
 	else{
 		puts("Cannot get userpubkey for registering user.");
@@ -312,6 +313,7 @@ const char* registerUserStr(char* username,sqlite3* db){ //returns string you ca
 	binn_object_set_str(obj,"b64rsa",(char*)b64buf); //set B64 Public Key of local user
 	binn_object_set_int32(obj,"rsalen",rsalen); //length of rsakey(needed for deserializing)
 	binn_object_set_str(obj,"rusername",(char*)getMUSER(db)); //Username to register 
+	binn_object_set_str(obj,"authkey",(char*)authkey); //authkey
 	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //Encode Everything
 	binn_free(obj);
 	sqlite3_finalize(stmt);	
@@ -348,7 +350,12 @@ char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 
 	char* muser = NULL;
 	if(sqlite3_step(stmt) == SQLITE_ROW){ 
 		 muser = (char*)sqlite3_column_text(stmt,0);
+	     	 sqlite3_finalize(stmt);
 	}
-	sqlite3_finalize(stmt);
+	else{
+		sqlite3_finalize(stmt);
+		return NULL;
+	}
 	return muser;
 }
+

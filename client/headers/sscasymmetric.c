@@ -69,6 +69,7 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path
 	RSA* rsa_pub = RSA_new();
 	PEM_read_bio_RSAPublicKey(rsa_pub_bio,&rsa_pub,NULL,NULL);
 	BIO_free(rsa_pub_bio);	
+	RSA_blinding_on(rsa_pub,NULL);
 	EVP_PKEY_assign_RSA(pubKey,rsa_pub);
 	
 	BIO* rsa_priv_bio = BIO_new_file(path4privkey,"r");
@@ -79,11 +80,12 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path
 	RSA* rsa_priv = RSA_new();
 	PEM_read_bio_RSAPrivateKey(rsa_priv_bio, &rsa_priv,NULL,NULL);
 	BIO_free(rsa_priv_bio);
-	EVP_PKEY_assign_RSA(privKey,rsa_priv); 
+	RSA_blinding_on(rsa_priv,NULL);
 	if(RSA_check_key(rsa_priv) <= 0){
 		puts("Invalid Private Key");
 		return 0;	
 	}
+	EVP_PKEY_assign_RSA(privKey,rsa_priv); 
 	return 1;
 
 }

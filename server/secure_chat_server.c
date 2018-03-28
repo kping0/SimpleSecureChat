@@ -17,6 +17,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h> 
 #include <sqlite3.h>
+
 #include "headers/binn.h" //Binn library 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 
@@ -60,6 +61,8 @@ sqlite3* initDB(char* dbfname);
 const char* GetEncodedRSA(char* username, sqlite3* db);
 
 char* GetUserMessagesSRV(char* username,sqlite3* db);
+
+char* getUserAuthKey(char* username, sqlite3* db); //gets authkey of user 'username', used for authentication
 
 int main(void){
     //register signal handlers..
@@ -128,23 +131,12 @@ int main(void){
                 	goto end;
             	}
 		buf[4095] = '\0';
-		binn* obj = binn_open(base64decode(buf,strlen(buf)));
-		if(obj == NULL) goto end;
-		int msgp = binn_object_int32(obj,"msgp");
-		if(msgp == MSGSND){ //User wants to send a message to a user
-			char* recipient = NULL;
-			recipient = binn_object_str(obj,"recipient");
-			char* newline = strchr(recipient,'\n');
-			if( newline ) *newline = 0;
-	
-			if(recipient == NULL)goto end;
-			printf("Buffering message from %s to %s\n",binn_object_str(obj,"sender"),recipient);
-			if(AddMSG2DB(db,recipient,(unsigned char*)buf) == -1){
-				puts("Error Adding MSG to DB");
-			}
-		}
-		else if(msgp == REGRSA){ //User wants to register a username with a public key
-			char* rusername = binn_object_str(obj,"rusername");
+		binn* obj0 = binn_open(base64decode(buf,strlen(buf)));
+		if(obj0 == NULL) goto end;
+		int msgp0 = binn_object_int32(obj0,"msgp");
+
+		 if(msgp0 == REGRSA){ //User wants to register a username with a public key
+			char* rusername = binn_object_str(obj0,"rusername");
 			char* newline = strchr(rusername,'\n');
 			if( newline ) *newline = 0;
 	
@@ -154,32 +146,80 @@ int main(void){
 			}
 			else{
 				puts("inserting user into db");
-				char* b64rsa = binn_object_str(obj,"b64rsa");
-				int rsalen = binn_object_int32(obj,"rsalen");
-				char* authkey = binn_object_str(obj,"authkey");
+				char* b64rsa = binn_object_str(obj0,"b64rsa");
+				int rsalen = binn_object_int32(obj0,"rsalen");
+				char* authkey = binn_object_str(obj0,"authkey");
 				if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
 					puts("error inserting user");
 				}
 			}
 		}
-		else if(msgp == GETRSA){ //Client is requesting a User Public Key
-			puts("Client Requested Public Key,handling...");
-			char* rsausername = binn_object_str(obj,"username");
-			const char* uRSAenc = GetEncodedRSA(rsausername,db);
-			if(uRSAenc != NULL) SSL_write(ssl,uRSAenc,strlen(uRSAenc));
+		else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
+			puts("User wants to authenticate, handling...");
+			char* userauthk = (char*)binn_object_str(obj0,"authkey");
+			char* authusername = (char*)binn_object_str(obj0,"username");
+			char* userauthk_db = getUserAuthKey(authusername,db);
+			if(strncmp(userauthk,userauthk_db,strlen(userauthk_db)) == 0){
+				printf("User %s authenticated.\n",authusername);
+				binn_free(obj0);
+				while(1){
+					int r = SSL_read(ssl,buf, 4096); 
+				    	switch (SSL_get_error(ssl, r))
+				    	{ 
+				    	case SSL_ERROR_NONE: 
+				       		 break;
+				    	case SSL_ERROR_ZERO_RETURN: 
+						goto end; 
+				    	default: 
+						goto end;
+				    	}
+					buf[4095] = '\0';
+					binn* obj = binn_open(base64decode(buf,strlen(buf)));
+					if(obj == NULL) goto end;
+					int msgp = binn_object_int32(obj,"msgp");
+					if(msgp == GETRSA){ //Client is requesting a User Public Key
+						puts("Client Requested Public Key,handling...");
+						char* rsausername = binn_object_str(obj,"username");
+						const char* uRSAenc = GetEncodedRSA(rsausername,db);
+						if(uRSAenc != NULL) SSL_write(ssl,uRSAenc,strlen(uRSAenc));
+					}
+					else if(msgp == MSGREC){ //Client is requesting stored messages
+						puts("Client Requesting New Messages,handling...");
+						char* retmsg = GetUserMessagesSRV(authusername,db);
+						printf("Length of message is %d\n",(int)strlen(retmsg));
+						if(retmsg != NULL) SSL_write(ssl,retmsg,strlen(retmsg));
+						//call function that returns an int,(messages available)send it to the client,and then send i messages to client in while() loop. 
+					}
+					else if(msgp == MSGSND){ //User wants to send a message to a user
+						char* recipient = NULL;
+						recipient = binn_object_str(obj,"recipient");
+						char* sender = NULL;
+						sender = binn_object_str(obj,"sender");
+						if(strcmp(sender,authusername) != 0){
+							puts("User tried to send a message with a fake username!, killing connection");			
+							goto end;
+						}	
+						binn_object_set_str(obj,"sender",authusername);
+						printf("set username %s\n",binn_object_str(obj,"sender"));
+						char* newline = strchr(recipient,'\n');
+						if( newline ) *newline = 0;
+						char* b64modbuf = base64encode(binn_ptr(obj),binn_size(obj));	
+						if(recipient == NULL)goto end;
+						printf("Buffering message from %s to %s\n",authusername,recipient);
+						if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
+							puts("Error Adding MSG to DB");
+						}				
+					}
+
+					binn_free(obj);
+				}
+			}
+			else{
+				printf("User %s failed to authenticate.\n",authusername);
+			}	
 		}
-		else if(msgp == MSGREC){ //Client is requesting stored messages
-			puts("Client Requesting New Messages,handling...");
-			char* username = binn_object_str(obj,"username");
-			char* retmsg = GetUserMessagesSRV(username,db);
-			printf("Length of message is %d\n",(int)strlen(retmsg));
-			if(retmsg != NULL) SSL_write(ssl,retmsg,strlen(retmsg));
-			//call function that returns an int,(messages available)send it to the client,and then send i messages to client in while() loop. 
-		}
-		else if(msgp == AUTHUSR){ //User wants to authenticate so he can receive messages.
-			puts("User wants to authenticate.");
-		}
-		binn_free(obj);
+
+		binn_free(obj0);
 	}
 end: //Commands to run before exit & then exit
 	puts("Ending Client Session");
@@ -401,4 +441,20 @@ void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills al
 	errno = saved_errno;
 }
 
-
+char* getUserAuthKey(char* username, sqlite3* db){
+	sqlite3_stmt* stmt;
+	unsigned char* authkey = NULL;
+	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=?1;",-1,&stmt,NULL);
+	int uid = getUserUID(username,db);
+	sqlite3_bind_int(stmt,1,uid);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		authkey = (unsigned char*)sqlite3_column_text(stmt,0);
+	}
+	else{
+		puts("ERROR retrieving authkey from DB");
+		sqlite3_finalize(stmt);
+		return NULL;	
+	}
+	sqlite3_finalize(stmt);
+	return (char*)authkey;
+}

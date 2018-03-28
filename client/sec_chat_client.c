@@ -58,6 +58,8 @@ const char* ServerGetMessages(sqlite3* db); //Returns string that the server wil
 	
 char* getMUSER(sqlite3* db); //Returns Username that has the uid=1 (your username)
 
+char* AuthUSR(sqlite3* db);
+	
 //Startpoint
 int main(void){
 	puts("Starting secure chat application...");
@@ -106,6 +108,8 @@ int main(void){
 	char* regubuf = (char*)registerUserStr(db);
 	if(regubuf != NULL)BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
 
+	char* authmsg = AuthUSR(db);
+	if(authmsg != NULL)BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
 	char msg2test[1024];
 	char* decbuf;
 	char* encbuf;
@@ -216,12 +220,12 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	obj = binn_object();	
 	EVP_PKEY * userpubk = get_pubk_username(username,db);
 	sqlite3_stmt *stmt;
-	binn_object_set_str(obj,"recipient",username);
-	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
-	if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
-		binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
-	}
-	sqlite3_finalize(stmt);
+        binn_object_set_str(obj,"recipient",username);
+        sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
+        if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
+                binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
+        }
+        sqlite3_finalize(stmt);
 
 	unsigned char* ek = malloc(EVP_PKEY_size(userpubk));
 	int ekl = EVP_PKEY_size(userpubk); 
@@ -359,3 +363,25 @@ char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 
 	return muser;
 }
 
+char* AuthUSR(sqlite3* db){
+	sqlite3_stmt* stmt;
+	char* authkey = NULL;
+	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=1;",-1,&stmt,NULL);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		authkey = (char*)sqlite3_column_text(stmt,0);
+		printf("Your authkey is:%s\n",authkey);
+	}
+	else{
+		sqlite3_finalize(stmt);
+		return NULL;
+	}
+	binn* obj = binn_object();
+	char* username = getMUSER(db);
+	binn_object_set_str(obj,"username",username);
+	binn_object_set_int32(obj,"msgp",AUTHUSR);
+	binn_object_set_str(obj,"authkey",authkey);
+	char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
+	binn_free(obj);
+	sqlite3_finalize(stmt);
+	return final_b64;
+}

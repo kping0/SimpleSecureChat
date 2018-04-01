@@ -17,6 +17,8 @@
 #include <openssl/pem.h>
 #include <sqlite3.h> 
 
+#include "settings.h"
+
 char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
 
 char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
@@ -32,5 +34,15 @@ int DBUserInit(sqlite3 *db,char* pkeyfn);
 EVP_PKEY *get_pubk_username(char* username,sqlite3 *db);
 
 EVP_PKEY *get_pubk_uid(int uid,sqlite3 *db);
+
+const char* registerUserStr(sqlite3* db); //returns string you can pass to server to register your user with your public key.
+
+const char* ServerGetUserRSA(char* username);
+
+const char* ServerGetMessages(sqlite3* db); //Returns string that the server will interpret to send you your messages.
+	
+char* getMUSER(sqlite3* db); //Returns Username that has the uid=1 (your username)
+
+char* AuthUSR(sqlite3* db);
 
 #endif

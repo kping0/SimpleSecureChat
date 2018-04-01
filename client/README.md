@@ -4,7 +4,7 @@ To compile, install "make" and run:
 
     make
     
-To customize the client, change the definitions on the top of the sec_chat_client.c file. Example:
+To customize the client, change the definitions in the "headers/settings.h" file. Example:
 
-    #define HOST_NAME "xxx.xxx.xxx.xxx" //Server IP
+    #define HOST_NAME "xxx.xxx.xxx.xxx" 
     ...

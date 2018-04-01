@@ -16,6 +16,8 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 
+#include "settings.h"
+
 #ifndef sscsslstruct
 #define sscsslstruct
 struct ssl_str{ 

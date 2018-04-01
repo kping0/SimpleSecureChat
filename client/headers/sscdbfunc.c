@@ -15,6 +15,8 @@
 #include <openssl/pem.h>
 
 #include <sqlite3.h> 
+#include "sscdbfunc.h"
+#include "binn.h"
 
 char *base64encode (const void *b64_encode_this, int encode_this_many_bytes){
     BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
@@ -155,16 +157,21 @@ int DBUserInit(sqlite3 *db,char* pkeyfn){ //check for own user & create if not f
 		}
 		RSA* rsa_pubk = RSA_new();
 		PEM_read_bio_RSAPublicKey(rsa_pub_bio,&rsa_pubk,NULL,NULL);
-		unsigned char* authkey = malloc(128);
+		unsigned char* authkey = malloc(512);
 		RAND_poll();
-		if(RAND_bytes(authkey,128) != 1){
+		if(RAND_bytes(authkey,512) != 1){
 			puts("Generating authkey ERROR");
 			return 0;
 		}
-		char* b64authkey = base64encode(authkey,128);
-		(void)addKnownUser(username,rsa_pubk,db,b64authkey);
+		char* b64authkey = base64encode(authkey,512);
+		char* b64authkey256 = malloc(256);
+		memcpy(b64authkey256,b64authkey,256); //Shorten take part of b64encoded random value as 256 Byte authkey
+		b64authkey256[256] = '\0';
+		printf("Length of authkey is %i\n",strlen(b64authkey256));
+		(void)addKnownUser(username,rsa_pubk,db,b64authkey256);
 		free(authkey);
 		free(b64authkey);
+		free(b64authkey256);
 	}
 	return 1;
 }
@@ -209,5 +216,96 @@ EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based
 	stmt = NULL;
 	return pubkey;
 
+}
+const char* registerUserStr(sqlite3* db){ //returns string you can pass to server to register your user with your public key.
+
+	sqlite3_stmt *stmt;
+	int rsalen;
+	unsigned char *b64buf = NULL;
+	unsigned char* authkey = NULL;
+	sqlite3_prepare_v2(db,"select rsapub64,rsalen,authkey from knownusers where uid=1",-1,&stmt,NULL);
+	if(sqlite3_step(stmt) == SQLITE_ROW){ //Get B64 Public Key for local user
+		rsalen = sqlite3_column_int(stmt,1);
+		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
+		authkey = (unsigned char*)sqlite3_column_text(stmt,2); //get authkey 
+	}
+	else{
+		puts("Cannot get userpubkey for registering user.");
+		sqlite3_finalize(stmt);
+		return NULL;
+	}
+	binn* obj;
+	obj = binn_object();
+	binn_object_set_int32(obj,"msgp",REGRSA); //message purpose
+	binn_object_set_str(obj,"b64rsa",(char*)b64buf); //set B64 Public Key of local user
+	binn_object_set_int32(obj,"rsalen",rsalen); //length of rsakey(needed for deserializing)
+	binn_object_set_str(obj,"rusername",(char*)getMUSER(db)); //Username to register 
+	binn_object_set_str(obj,"authkey",(char*)authkey); //authkey
+	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //Encode Everything
+	binn_free(obj);
+	sqlite3_finalize(stmt);	
+	return final_b64;
+}
+
+const char* ServerGetUserRSA(char* username){ //Generates a character array that can be sent the message buffer server to request a userpublickey
+	binn* obj;
+	obj = binn_object();
+	char* newline = strchr(username,'\n');
+	if(newline)*newline=0;
+	binn_object_set_int32(obj,"msgp",GETRSA); //message purpose
+	binn_object_set_str(obj,"username",username); //Set to user requested
+	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //Encode Everything
+	binn_free(obj);
+	return final_b64;		
+}
+
+const char* ServerGetMessages(sqlite3* db){ //Generates a character array that can be sent to message buffer server to receive back your stored encrypted message
+	char* username = getMUSER(db);
+	binn* obj;
+	obj = binn_object();
+	binn_object_set_int32(obj,"msgp",MSGREC); //message purpose
+	binn_object_set_str(obj,"username",username); //Current username
+	//binn_object_set_str(obj,"authkey",authkey); //will in the future be used(registered with the name), sha256 and stored in server db.
+	const char* msg2srv64 = base64encode(binn_ptr(obj),binn_size(obj));
+	binn_free(obj);
+	return msg2srv64;
+}
+
+char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 1)
+	sqlite3_stmt* stmt;
+	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
+	char* muser = malloc(200);
+	if(sqlite3_step(stmt) == SQLITE_ROW){ 
+		 sprintf(muser,"%s",sqlite3_column_text(stmt,0),200);	
+	     	 sqlite3_finalize(stmt);
+	}
+	else{
+		sqlite3_finalize(stmt);
+		return NULL;
+	}
+	return muser;
+}
+
+char* AuthUSR(sqlite3* db){
+	sqlite3_stmt* stmt;
+	char* authkey = NULL;
+	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=1;",-1,&stmt,NULL);
+	if(sqlite3_step(stmt) == SQLITE_ROW){
+		authkey = (char*)sqlite3_column_text(stmt,0);
+//		printf("Your authkey is:%s\n",authkey);
+	}
+	else{
+		sqlite3_finalize(stmt);
+		return NULL;
+	}
+	binn* obj = binn_object();
+	char* username = getMUSER(db);
+	binn_object_set_str(obj,"username",username);
+	binn_object_set_int32(obj,"msgp",AUTHUSR);
+	binn_object_set_str(obj,"authkey",authkey);
+	char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
+	binn_free(obj);
+	sqlite3_finalize(stmt);
+	return final_b64;
 }
 

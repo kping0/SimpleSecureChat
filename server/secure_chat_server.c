@@ -20,49 +20,11 @@
 
 #include "headers/binn.h" //Binn library 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
-
-#define SRVDB "srvdb.db" //Server message database filename.
-
-//Message Purposes
-#define MSGSND 1 //Message Send(normal message)
-#define MSGREC 4 //Get new messages 
-#define REGRSA 2 //Register user in association with an rsa public key
-#define GETRSA 3 //Get user public key
-
-#define MSGSND_RSP 5 //Server response to MSGSND
-#define MSGREC_RSP 6 //Server response to MSGREC
-#define REGRSA_RSP 7 //Server response to REGRSA
-#define GETRSA_RSP 8 //Server response to GETRSA
-
-#define AUTHUSR 9 //Sent from client to authenticate
+#include "headers/settings.h"
 
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 volatile int gsigflag = 0; //flag so that SIGINT is not handled twice if CTRL-C is hit twice
-
-int checkforUser(char* username,sqlite3* db); 
-
-int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db);
-	
-char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
-
-char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
-
-void sig_handler(int sig);
-
-void childexit_handler(int sig);
-
-int getUserUID(char* username,sqlite3 *db);
-
-int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message);
-
-sqlite3* initDB(char* dbfname);
-
-const char* GetEncodedRSA(char* username, sqlite3* db);
-
-char* GetUserMessagesSRV(char* username,sqlite3* db);
-
-char* getUserAuthKey(char* username, sqlite3* db); //gets authkey of user 'username', used for authentication
 
 int main(void){
     //register signal handlers..
@@ -117,25 +79,27 @@ int main(void){
         ERR_print_errors_fp(stderr);
         
         BIO *bio = BIO_pop(accept_bio);
+	char* buf = malloc(4096); //Main receive buffer for receiving from SSL socket
+	char* sbinnobj = NULL;
 	while(1){ //Handle request until interrupt or connection problems	
-		char buf[4096];
 		memset(buf,'\0',4096);
-        	int r = SSL_read(ssl,buf, 4096); 
-            	switch (SSL_get_error(ssl, r))
-            	{ 
-            	case SSL_ERROR_NONE: 
-               		 break;
-            	case SSL_ERROR_ZERO_RETURN: 
-                	goto end; 
-            	default: 
-                	goto end;
-            	}
+        	int r = SSL_read(ssl,buf, 4095); 
 		buf[4095] = '\0';
-		binn* obj0 = binn_open(base64decode(buf,strlen(buf)));
-		if(obj0 == NULL) goto end;
-		int msgp0 = binn_object_int32(obj0,"msgp");
+            	switch (SSL_get_error(ssl, r)){ 
+	            	case SSL_ERROR_NONE: 
+        	       		 break;
+            		case SSL_ERROR_ZERO_RETURN: 
+               		 	goto end; 
+            		default: 
+                		goto end;
+            	}
 
-		 if(msgp0 == REGRSA){ //User wants to register a username with a public key
+		sbinnobj = base64decode(buf,strlen(buf));
+		binn* obj0 = binn_open(sbinnobj);
+		if(obj0 == NULL) goto end;
+
+		int msgp0 = binn_object_int32(obj0,"msgp");
+		if(msgp0 == REGRSA){ //User wants to register a username with a public key
 			char* rusername = binn_object_str(obj0,"rusername");
 			char* newline = strchr(rusername,'\n');
 			if( newline ) *newline = 0;
@@ -149,6 +113,7 @@ int main(void){
 				char* b64rsa = binn_object_str(obj0,"b64rsa");
 				int rsalen = binn_object_int32(obj0,"rsalen");
 				char* authkey = binn_object_str(obj0,"authkey");
+				if(strlen(authkey) != 256) goto end;
 				if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
 					puts("error inserting user");
 				}
@@ -157,11 +122,14 @@ int main(void){
 		else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
 			puts("User wants to authenticate, handling...");
 			char* userauthk = (char*)binn_object_str(obj0,"authkey");
+			if(strlen(userauthk) != 256) goto end; //If supplied authkey is not 256B exit
 			char* authusername = (char*)binn_object_str(obj0,"username");
 			char* userauthk_db = getUserAuthKey(authusername,db);
-			if(strncmp(userauthk,userauthk_db,strlen(userauthk_db)) == 0){
+			if(memcmp(userauthk_db,userauthk,256) == 0){ //Compare stored authkey to usersupplied authkey
 				printf("User %s authenticated.\n",authusername);
 				binn_free(obj0);
+				free(userauthk_db);
+				userauthk_db = NULL; //for sanities sake set to NULL
 				while(1){
 					int r = SSL_read(ssl,buf, 4096); 
 				    	switch (SSL_get_error(ssl, r))
@@ -174,9 +142,13 @@ int main(void){
 						goto end;
 				    	}
 					buf[4095] = '\0';
-					binn* obj = binn_open(base64decode(buf,strlen(buf)));
+					sbinnobj = base64decode(buf,strlen(buf));
+					binn* obj = binn_open(sbinnobj);
 					if(obj == NULL) goto end;
 					int msgp = binn_object_int32(obj,"msgp");
+					/*
+					* Important Functions are only accessible when user has authenticated.
+					*/
 					if(msgp == GETRSA){ //Client is requesting a User Public Key
 						puts("Client Requested Public Key,handling...");
 						char* rsausername = binn_object_str(obj,"username");
@@ -196,7 +168,7 @@ int main(void){
 						char* sender = NULL;
 						sender = binn_object_str(obj,"sender");
 						if(strcmp(sender,authusername) != 0){
-							puts("User tried to send a message with a fake username!, killing connection");			
+							puts("User tried to send a message with a fake username!");
 							goto end;
 						}	
 						binn_object_set_str(obj,"sender",authusername);
@@ -212,20 +184,27 @@ int main(void){
 					}
 
 					binn_free(obj);
+					free(sbinnobj);
+					sbinnobj = NULL; //for sanity reasons set to NULL
 				}
 			}
 			else{
 				printf("User %s failed to authenticate.\n",authusername);
+				free(userauthk_db);
+				userauthk_db = NULL; //for sanities sake
 			}	
 		}
 
 		binn_free(obj0);
+		free(sbinnobj);
+		sbinnobj = NULL; //for sanity reasons set to NULL
 	}
-end: //Commands to run before exit & then exit
+end: //cleanup & exit
 	puts("Ending Client Session");
 	BIO_free(bio);
         SSL_free(ssl);
-        close(client);
+        close(client); 
+	free(buf); 
 	exit(0);
 	} 
 	/*
@@ -240,221 +219,4 @@ end: //Commands to run before exit & then exit
     cleanup_openssl();
     return 0;
 }
-int checkforUser(char* username,sqlite3* db){ //Check if user exists in database, returns 1 if true, 0 if false
-	sqlite3_stmt *stmt;
-	sqlite3_prepare_v2(db,"select uid from knownusers where username = ?1",-1,&stmt,0);
-	sqlite3_bind_text(stmt,1,username,-1,0);
-	if(sqlite3_step(stmt) == SQLITE_ROW){
-		sqlite3_finalize(stmt);
-		return 1;	
-	}
-	else{
-		sqlite3_finalize(stmt);
-		return 0;
-	}	
-}
-int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db){ //Add User to database, returns 1 on success,0 on error
-	printf("Trying to add user: %s,b64rsa is %s, w len of %i, authkey is %s\n",username,b64rsa,rsalen,authkey);
-	sqlite3_stmt* stmt;
-	char* sql = "insert into knownusers(uid,username,rsapub64,rsalen,authkey)  values(NULL,?1,?2,?3,?4);";
-	sqlite3_prepare_v2(db,sql,-1,&stmt,0);
-	sqlite3_bind_text(stmt,1,username,-1,0);
-	sqlite3_bind_text(stmt,2,b64rsa,-1,0);
-	sqlite3_bind_int(stmt,3,rsalen);
-	sqlite3_bind_text(stmt,4,authkey,-1,0);
-	if(sqlite3_step(stmt) != SQLITE_DONE){
-		puts("error in sql statement exec");
-		return 0;
-	}
-	sqlite3_finalize(stmt);
-	return 1;	
 
-}
-	
-char *base64encode (const void *b64_encode_this, int encode_this_many_bytes){
-    BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
-    BUF_MEM *mem_bio_mem_ptr;    //Pointer to a "memory BIO" structure holding our base64 data.
-    b64_bio = BIO_new(BIO_f_base64());                      //Initialize our base64 filter BIO.
-    mem_bio = BIO_new(BIO_s_mem());                           //Initialize our memory sink BIO.
-    BIO_push(b64_bio, mem_bio);            //Link the BIOs by creating a filter-sink BIO chain.
-    BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL);  //No newlines every 64 characters or less.
-    BIO_write(b64_bio, b64_encode_this, encode_this_many_bytes); //Records base64 encoded data.
-    BIO_flush(b64_bio);   //Flush data.  Necessary for b64 encoding, because of pad characters.
-    BIO_get_mem_ptr(mem_bio, &mem_bio_mem_ptr);  //Store address of mem_bio's memory structure.
-    BIO_set_close(mem_bio, BIO_NOCLOSE);   //Permit access to mem_ptr after BIOs are destroyed.
-    BIO_free_all(b64_bio);  //Destroys all BIOs in chain, starting with b64 (i.e. the 1st one).
-    BUF_MEM_grow(mem_bio_mem_ptr, (*mem_bio_mem_ptr).length + 1);   //Makes space for end null.
-    (*mem_bio_mem_ptr).data[(*mem_bio_mem_ptr).length] = '\0';  //Adds null-terminator to tail.
-    return (*mem_bio_mem_ptr).data; //Returns base-64 encoded data. (See: "buf_mem_st" struct).
-}
-
-/* https://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c */
-char *base64decode (const void *b64_decode_this, int decode_this_many_bytes){
-    BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
-    char *base64_decoded = calloc( (decode_this_many_bytes*3)/4+1, sizeof(char) ); //+1 = null.
-    b64_bio = BIO_new(BIO_f_base64());                      //Initialize our base64 filter BIO.
-    mem_bio = BIO_new(BIO_s_mem());                         //Initialize our memory source BIO.
-    BIO_write(mem_bio, b64_decode_this, decode_this_many_bytes); //Base64 data saved in source.
-    BIO_push(b64_bio, mem_bio);          //Link the BIOs by creating a filter-source BIO chain.
-    BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL);          //Don't require trailing newlines.
-    int decoded_byte_index = 0;   //Index where the next base64_decoded byte should be written.
-    while ( 0 < BIO_read(b64_bio, base64_decoded+decoded_byte_index, 1) ){ //Read byte-by-byte.
-        decoded_byte_index++; //Increment the index until read of BIO decoded data is complete.
-    } //Once we're done reading decoded data, BIO_read returns -1 even though there's no error.
-    BIO_free_all(b64_bio);  //Destroys all BIOs in chain, starting with b64 (i.e. the 1st one).
-    return base64_decoded;        //Returns base-64 decoded data with trailing null terminator.
-}
-
-
-void sig_handler(int sig){ //Function to handle signals
-	if(gsigflag != 1){ //check if signal was sent once already
-		gsigflag = 1;
-		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
-			printf("\nCaught Signal... Exiting\n");
-			if(sock != 0){
-				close(sock);
-				sock = 0;
-			}	
-			exit(EXIT_SUCCESS);
-		}
-		else if(sig == SIGFPE){
-			exit(EXIT_FAILURE);	
-		}
-		else if(sig == SIGILL){
-			exit(EXIT_FAILURE);
-		}
-		else{
-			exit(EXIT_FAILURE);	
-		}
-	}
-}
-
-int getUserUID(char* username,sqlite3 *db){ //gets uid for the username it is passed in args (to add a message to db for ex.)
-        int uid = -1; //default is error        
-        sqlite3_stmt *stmt;
-        sqlite3_prepare_v2(db,"select uid from knownusers where username=?1",-1,&stmt,NULL);
-        sqlite3_bind_text(stmt,1,username,-1,0);
-        if(sqlite3_step(stmt) == SQLITE_ROW){
-                uid = sqlite3_column_int(stmt,0);
-        }
-        sqlite3_finalize(stmt);
-        stmt = NULL;
-        return uid;
-}
-
-int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
-	sqlite3_stmt *stmt;
-	sqlite3_prepare_v2(db,"insert into messages(msgid,recvuid,message)values(NULL,?1,?2);",-1,&stmt,NULL);
-	int recvuid = getUserUID(recipient,db);
-	if(recvuid == -1){
-		puts("UID for recipient not found.");
-		return 0;
-	}
-	sqlite3_bind_int(stmt,1,recvuid);
-	sqlite3_bind_text(stmt,2,(const char*)message,-1,0);
-	sqlite3_step(stmt);
-	sqlite3_finalize(stmt);
-	stmt = NULL;
-	return 1;
-}
-
-sqlite3* initDB(char* dbfname){ //Initalize the Mysql Database and create the tables if not existant
-	sqlite3 *db;
-	sqlite3_stmt *stmt;
-	int rc = sqlite3_open(dbfname,&db);
-	char *errm = 0;
-	if(rc){ 
-		sqlite3_free(errm);
-		return NULL;
-	}
-	char* sql = "CREATE TABLE MESSAGES(MSGID INTEGER PRIMARY KEY,RECVUID INTEGER NOT NULL,MESSAGE TEXT NOT NULL);"; // table for messages 
-	sqlite3_exec(db,sql,NULL,0,&errm);
-
-	sql = "CREATE TABLE KNOWNUSERS(UID INTEGER PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INTEGER NOT NULL,AUTHKEY TEXT);"; //list of known users and public keys associated with the users
-	sqlite3_exec(db,sql,NULL,0,&errm);
-
-	sql = "insert into messages(msgid,recvuid,message)values(0,0,'testmessage');";
-	sqlite3_exec(db,sql,NULL,0,&errm);
-	
-	sql = "insert into knownusers(uid,username,rsapub64,rsalen) values(0,'testuser','testuser',0);";
-	sqlite3_exec(db,sql,NULL,0,&errm);
-	
-	sqlite3_free(errm);
-	sql = NULL;
-	sqlite3_prepare_v2(db,"select * from messages where msgid=0",-1,&stmt,NULL);
-	if(sqlite3_step(stmt) == SQLITE_ROW){
-		puts("Loaded SQLITE OK");
-	}else{
-		puts("Loaded SQLITE ERROR");
-		return NULL;			
-	}
-	sqlite3_finalize(stmt);	
-	stmt = NULL;
-	return db;
-}
-
-
-const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns an encoded user RSA key.
-	binn* obj;
-	obj = binn_object();
-	char* newline = strchr(username,'\n');
-	if( newline ) *newline = 0;
-	sqlite3_stmt* stmt;
-	sqlite3_prepare_v2(db,"SELECT RSAPUB64,RSALEN FROM KNOWNUSERS WHERE USERNAME=?1;",-1,&stmt,NULL);
-	sqlite3_bind_text(stmt,1,username,-1,0);
-	if(sqlite3_step(stmt) != SQLITE_ROW){
-		sqlite3_finalize(stmt);
-		return "GETRSA_RSP_ERROR";
-	}
-	char* rsapub64 = (char*)sqlite3_column_text(stmt,0);
-	int rsalen = sqlite3_column_int(stmt,1);
-	binn_object_set_int32(obj,"msgp",GETRSA_RSP);
-	binn_object_set_str(obj,"b64rsa",rsapub64);
-	binn_object_set_int32(obj,"rsalen",rsalen);
-	sqlite3_finalize(stmt);
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
-	binn_free(obj);
-	return final_b64;
-}
-
-
-char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with encoded user messages
-	sqlite3_stmt* stmt;
-	binn* list;
-	list = binn_list();
-	sqlite3_prepare_v2(db,"select message from messages where recvuid=?1;",-1,&stmt,NULL);
-	int uid = getUserUID(username,db);
-	sqlite3_bind_int(stmt,1,uid);
-	while(sqlite3_step(stmt) == SQLITE_ROW){
-		binn_list_add_str(list,(char*)sqlite3_column_text(stmt,0));
-	}
-	sqlite3_finalize(stmt);
-	char* usermsgbuf64 = base64encode(binn_ptr(list),binn_size(list));
-	binn_free(list);
-	return usermsgbuf64;
-}
-
-
-void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills all zombie processes
-	int saved_errno = errno;
-	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
-	errno = saved_errno;
-}
-
-char* getUserAuthKey(char* username, sqlite3* db){
-	sqlite3_stmt* stmt;
-	unsigned char* authkey = NULL;
-	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=?1;",-1,&stmt,NULL);
-	int uid = getUserUID(username,db);
-	sqlite3_bind_int(stmt,1,uid);
-	if(sqlite3_step(stmt) == SQLITE_ROW){
-		authkey = (unsigned char*)sqlite3_column_text(stmt,0);
-	}
-	else{
-		puts("ERROR retrieving authkey from DB");
-		sqlite3_finalize(stmt);
-		return NULL;	
-	}
-	sqlite3_finalize(stmt);
-	return (char*)authkey;
-}

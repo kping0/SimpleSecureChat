@@ -5,6 +5,8 @@
 */
 #define SRVDB "srvdb.db" //Server message database filename.
 
+#define SSC_VERIFY_VARIABLES //sanity checks variables at a minimal cost of performance (good for security)
+
 //Message Purposes
 #define MSGSND 1 //Message Send(normal message)
 #define MSGREC 4 //Get new messages 

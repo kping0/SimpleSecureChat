@@ -45,4 +45,5 @@ char* getMUSER(sqlite3* db); //Returns Username that has the uid=1 (your usernam
 
 char* AuthUSR(sqlite3* db);
 
+int AddMessage(char* message, char* recipient,char* sender, sqlite3* db); //Add message to database
 #endif

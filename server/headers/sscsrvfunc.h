@@ -26,8 +26,6 @@
 
 extern int sock;
 
-extern volatile int gsigflag;
-
 int create_socket(int port);
 
 void init_openssl(void);

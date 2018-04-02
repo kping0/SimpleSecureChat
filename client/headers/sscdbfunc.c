@@ -167,7 +167,6 @@ int DBUserInit(sqlite3 *db,char* pkeyfn){ //check for own user & create if not f
 		char* b64authkey256 = malloc(256);
 		memcpy(b64authkey256,b64authkey,256); //Shorten take part of b64encoded random value as 256 Byte authkey
 		b64authkey256[256] = '\0';
-		printf("Length of authkey is %i\n",strlen(b64authkey256));
 		(void)addKnownUser(username,rsa_pubk,db,b64authkey256);
 		free(authkey);
 		free(b64authkey);
@@ -211,6 +210,10 @@ EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based
 		p = buf;
 		if(!d2i_RSAPublicKey(&x,(const unsigned char**)&p, rsalen)) return NULL;
 		EVP_PKEY_assign_RSA(pubkey,x);
+	}
+	else{
+		sqlite3_finalize(stmt);
+		return NULL;
 	}
 	sqlite3_finalize(stmt);
 	stmt = NULL;
@@ -276,7 +279,7 @@ char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
 	char* muser = malloc(200);
 	if(sqlite3_step(stmt) == SQLITE_ROW){ 
-		 sprintf(muser,"%s",sqlite3_column_text(stmt,0),200);	
+		 sprintf(muser,"%s",sqlite3_column_text(stmt,0));	
 	     	 sqlite3_finalize(stmt);
 	}
 	else{

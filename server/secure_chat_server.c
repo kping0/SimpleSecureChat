@@ -9,6 +9,7 @@
 #include <openssl/err.h>
 #include <openssl/bio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <errno.h>
 #include <openssl/crypto.h> 
 #include <openssl/bn.h>
@@ -20,13 +21,14 @@
 
 #include "headers/binn.h" //Binn library 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
-#include "headers/settings.h"
+#include "headers/settings.h" //settings for ssc
 
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
-volatile int gsigflag = 0; //flag so that SIGINT is not handled twice if CTRL-C is hit twice
-
 int main(void){
+    #ifdef SSC_VERIFY_VARIABLES
+    puts("SSC_VERIFY_VARIABLES IS DEFINED.");
+    #endif
     //register signal handlers..
     signal(SIGINT,sig_handler);
     signal(SIGABRT,sig_handler);
@@ -67,7 +69,7 @@ int main(void){
             exit(EXIT_FAILURE);
         }
 	//Setup ssl with the client.
- 	SSL *ssl;
+ 	SSL *ssl = NULL;
 	ssl = SSL_new(ctx);
         SSL_set_fd(ssl, client);
 	
@@ -79,6 +81,9 @@ int main(void){
         ERR_print_errors_fp(stderr);
         
         BIO *bio = BIO_pop(accept_bio);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(ssl != NULL);
+	#endif
 	char* buf = malloc(4096); //Main receive buffer for receiving from SSL socket
 	char* sbinnobj = NULL;
 	while(1){ //Handle request until interrupt or connection problems	
@@ -95,6 +100,9 @@ int main(void){
             	}
 
 		sbinnobj = base64decode(buf,strlen(buf));
+		#ifdef SSC_VERIFY_VARIABLES
+		assert(sbinnobj != NULL);
+		#endif
 		binn* obj0 = binn_open(sbinnobj);
 		if(obj0 == NULL) goto end;
 
@@ -105,7 +113,6 @@ int main(void){
 			if( newline ) *newline = 0;
 	
 			if(checkforUser(rusername,db) == 1){
-				SSL_write(ssl,"REGRSA_RSP_ERROR",16);
 				puts("Cannot add user: username already taken.");
 			}
 			else{
@@ -144,7 +151,9 @@ int main(void){
 					buf[4095] = '\0';
 					sbinnobj = base64decode(buf,strlen(buf));
 					binn* obj = binn_open(sbinnobj);
+					#ifdef SSC_VERIFY_VARIABLES
 					if(obj == NULL) goto end;
+					#endif
 					int msgp = binn_object_int32(obj,"msgp");
 					/*
 					* Important Functions are only accessible when user has authenticated.
@@ -171,12 +180,12 @@ int main(void){
 							puts("User tried to send a message with a fake username!");
 							goto end;
 						}	
-						binn_object_set_str(obj,"sender",authusername);
-						printf("set username %s\n",binn_object_str(obj,"sender"));
 						char* newline = strchr(recipient,'\n');
 						if( newline ) *newline = 0;
 						char* b64modbuf = base64encode(binn_ptr(obj),binn_size(obj));	
+						#ifdef SSC_VERIFY_VARIABLES
 						if(recipient == NULL)goto end;
+						#endif
 						printf("Buffering message from %s to %s\n",authusername,recipient);
 						if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
 							puts("Error Adding MSG to DB");
@@ -196,6 +205,7 @@ int main(void){
 		}
 
 		binn_free(obj0);
+		obj0 = NULL;
 		free(sbinnobj);
 		sbinnobj = NULL; //for sanity reasons set to NULL
 	}

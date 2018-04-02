@@ -10,6 +10,7 @@
 #include <openssl/bio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 #include <openssl/crypto.h> 
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
@@ -21,7 +22,7 @@
 #include "sscsrvfunc.h"
 
 int create_socket(int port){
-    int s;
+    int s = 0;
     struct sockaddr_in addr;
 
     addr.sin_family = AF_INET;
@@ -43,7 +44,9 @@ int create_socket(int port){
 	perror("Unable to listen");
 	exit(EXIT_FAILURE);
     }
-
+    #ifdef SSC_VERIFY_VARIABLES
+    assert(s != 0);
+    #endif
     return s;
 }
 
@@ -92,9 +95,12 @@ void configure_context(SSL_CTX *ctx)
 }
 
 int checkforUser(char* username,sqlite3* db){ //Check if user exists in database, returns 1 if true, 0 if false
-	sqlite3_stmt *stmt;
+	sqlite3_stmt *stmt = NULL;
 	sqlite3_prepare_v2(db,"select uid from knownusers where username = ?1",-1,&stmt,0);
 	sqlite3_bind_text(stmt,1,username,-1,0);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		sqlite3_finalize(stmt);
 		return 1;	
@@ -106,13 +112,16 @@ int checkforUser(char* username,sqlite3* db){ //Check if user exists in database
 }
 int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db){ //Add User to database, returns 1 on success,0 on error
 	printf("Trying to add user: %s,b64rsa is %s, w len of %i, authkey is %s\n",username,b64rsa,rsalen,authkey);
-	sqlite3_stmt* stmt;
+	sqlite3_stmt* stmt = NULL;
 	char* sql = "insert into knownusers(uid,username,rsapub64,rsalen,authkey)  values(NULL,?1,?2,?3,?4);";
 	sqlite3_prepare_v2(db,sql,-1,&stmt,0);
 	sqlite3_bind_text(stmt,1,username,-1,0);
 	sqlite3_bind_text(stmt,2,b64rsa,-1,0);
 	sqlite3_bind_int(stmt,3,rsalen);
 	sqlite3_bind_text(stmt,4,authkey,-1,0);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	if(sqlite3_step(stmt) != SQLITE_DONE){
 		puts("error in sql statement exec");
 		return 0;
@@ -158,8 +167,6 @@ char *base64decode (const void *b64_decode_this, int decode_this_many_bytes){
 
 
 void sig_handler(int sig){ //Function to handle signals
-	if(gsigflag != 1){ //check if signal was sent once already
-		gsigflag = 1;
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
 			printf("\nCaught Signal... Exiting\n");
 			if(sock != 0){
@@ -177,14 +184,16 @@ void sig_handler(int sig){ //Function to handle signals
 		else{
 			exit(EXIT_FAILURE);	
 		}
-	}
 }
 
 int getUserUID(char* username,sqlite3 *db){ //gets uid for the username it is passed in args (to add a message to db for ex.)
         int uid = -1; //default is error        
-        sqlite3_stmt *stmt;
+        sqlite3_stmt *stmt = NULL;
         sqlite3_prepare_v2(db,"select uid from knownusers where username=?1",-1,&stmt,NULL);
         sqlite3_bind_text(stmt,1,username,-1,0);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
         if(sqlite3_step(stmt) == SQLITE_ROW){
                 uid = sqlite3_column_int(stmt,0);
         }
@@ -194,7 +203,7 @@ int getUserUID(char* username,sqlite3 *db){ //gets uid for the username it is pa
 }
 
 int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
-	sqlite3_stmt *stmt;
+	sqlite3_stmt *stmt = NULL;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,recvuid,message)values(NULL,?1,?2);",-1,&stmt,NULL);
 	int recvuid = getUserUID(recipient,db);
 	if(recvuid == -1){
@@ -203,6 +212,9 @@ int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a mess
 	}
 	sqlite3_bind_int(stmt,1,recvuid);
 	sqlite3_bind_text(stmt,2,(const char*)message,-1,0);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 	stmt = NULL;
@@ -250,9 +262,12 @@ const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns
 	obj = binn_object();
 	char* newline = strchr(username,'\n');
 	if( newline ) *newline = 0;
-	sqlite3_stmt* stmt;
+	sqlite3_stmt* stmt = NULL;
 	sqlite3_prepare_v2(db,"SELECT RSAPUB64,RSALEN FROM KNOWNUSERS WHERE USERNAME=?1;",-1,&stmt,NULL);
 	sqlite3_bind_text(stmt,1,username,-1,0);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	if(sqlite3_step(stmt) != SQLITE_ROW){
 		sqlite3_finalize(stmt);
 		return "GETRSA_RSP_ERROR";
@@ -264,18 +279,24 @@ const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns
 	binn_object_set_int32(obj,"rsalen",rsalen);
 	sqlite3_finalize(stmt);
 	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
+	#ifdef SSC_VERIFY_VARIABLES 
+	assert(strlen(final_b64) > 0);
+	#endif
 	binn_free(obj);
 	return final_b64;
 }
 
 
 char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with encoded user messages
-	sqlite3_stmt* stmt;
+	sqlite3_stmt* stmt = NULL;
 	binn* list;
 	list = binn_list();
 	sqlite3_prepare_v2(db,"select message from messages where recvuid=?1;",-1,&stmt,NULL);
 	int uid = getUserUID(username,db);
 	sqlite3_bind_int(stmt,1,uid);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	while(sqlite3_step(stmt) == SQLITE_ROW){
 		binn_list_add_str(list,(char*)sqlite3_column_text(stmt,0));
 	}
@@ -287,18 +308,22 @@ char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with enco
 
 
 void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills all zombie processes
-	printf("Child exited with Signal id %2d\n",sig);
+	printf("Child exited with Signal id %i\n",sig);
 	int saved_errno = errno;
 	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
 	errno = saved_errno;
 }
 
 char* getUserAuthKey(char* username, sqlite3* db){
-	sqlite3_stmt* stmt;
+	sqlite3_stmt* stmt = NULL;
 	unsigned char* authkey = malloc(256); 
+	memset(authkey,0,256);
 	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=?1;",-1,&stmt,NULL);
 	int uid = getUserUID(username,db);
 	sqlite3_bind_int(stmt,1,uid);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(stmt != NULL);
+	#endif
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		const char* sqlqueryret = (const char*)sqlite3_column_text(stmt,0);
 		if(strlen(sqlqueryret) != 256){
@@ -307,6 +332,9 @@ char* getUserAuthKey(char* username, sqlite3* db){
 		}
 		memcpy(authkey,sqlqueryret,256);
 		sqlite3_finalize(stmt);
+		#ifdef SSC_VERIFY_VARIABLES
+		assert(strlen((const char*)authkey) == 256 && authkey != NULL);
+		#endif
 		return (char*)authkey;
 	}
 	else{

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include <openssl/ssl.h>
 #include <openssl/crypto.h> 
@@ -33,10 +34,15 @@ int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://www.github.com/kping0/simplesecurechat/client')");
 	puts("Host your own server with ('https://.www.github.com/kping0/simplesecurechat/server')");
+	#ifdef SSC_VERIFY_VARIABLES
+	puts("SSC_VERIFY_VARIABLES IS DEFINED.");
+	#endif
+	#ifndef SSC_VERIFY_VARIABLES
+	puts("SSC_VERIFY_VARIABLES IS NOT DEFINED");
+	#endif
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
-		//BIO_write(tls_vars->bio_obj,"12345 this is a more complicated message",40);
 		puts("SSL/TLS OK");
 		puts("Connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
 	}
@@ -56,7 +62,9 @@ int main(void){
 	}
 	else {
 		puts("Loaded Keypair OK");
-		test_keypair(pubk_evp,priv_evp);
+	#ifdef SSC_VERIFY_VARIABLES
+		assert(test_keypair(pubk_evp,priv_evp) == 1);
+	#endif
 	}
 	//Load SQLITE Database
 	sqlite3 *db = initDB(DB_FNAME);
@@ -71,64 +79,82 @@ int main(void){
 		puts("Usercheck ERROR");
 		goto CLEANUP;
 	}
-	char* yourusername = getMUSER(db);
-	printf("Your username is: %s, trying to register it with the server\n",yourusername);
+//register your user
+	printf("Your username is: %s, trying to register it with the server\n",getMUSER(db));
 	char* regubuf = (char*)registerUserStr(db);
-	if(regubuf != NULL)BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(regubuf != NULL && strlen(regubuf) > 0);
+	#endif
+	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
+	free(regubuf);
 
+//Authenticate USER
 	char* authmsg = AuthUSR(db);
 	printf("Trying to authenticate your user\n");
-	if(authmsg != NULL)BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(authmsg != NULL && strlen(authmsg) > 0);
+	#endif
+	BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
 	free(authmsg);
-	char msg2test[1024];
 	char* decbuf;
 	char* encbuf;
+	//Buffers for TLS connection
+	char* rxbuf = malloc(4096);
+	char* txbuf = malloc(4096);
+	//Stdin Buffers
+	char* inbuf = malloc(1024);
+	char* inbuf2 = malloc(1024);
 //
 // This is a very Quickly written UI.
 //
 
-	while(fgetc(stdin) != '\n'){}
 	while(1){ //to be replaced by GUI
 		puts("Options: Send message(1),AddUser(2),Get messages(3)");
 		int options;
 		options = fgetc(stdin);
-		while(fgetc(stdin) != '\n'){}
-		switch( options ){
+		while(fgetc(stdin) != '\n'){} //Clear STDIN
+		switch(options){
 			case '1': //If User wants to send a message do:
-				memset(msg2test,0,sizeof(msg2test));
+				memset(inbuf,0,1024);
+				memset(inbuf2,0,1024);
 				printf("recipient name: ");
-				char runm[1024];
-				fgets(runm,1024,stdin);
-				puts("Message to user:");
-				fgets(msg2test,1024,stdin);
+				fgets(inbuf,1024,stdin);
+				printf("Message to user: ");
+				fgets(inbuf2,1024,stdin);
 				//sending user
-				encbuf = (char*)encryptmsg(runm,(unsigned char*)msg2test,db); //"user" would be the receiving username
+				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,db); //"user" would be the receiving username
+				#ifdef SSC_VERIFY_VARIABLES
+				assert(encbuf != NULL);
+				#endif	
 				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
 				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
+				free(encbuf);
+				encbuf = NULL;
 				break;
 
 			case '2': //If User wants to add another user do:
-				memset(msg2test,0,sizeof(msg2test));
+				memset(inbuf,0,1024);
 				puts("Username for public key to get:");
-				fgets(msg2test,1024,stdin);
-			
-				const char* gtrsa64 = ServerGetUserRSA(msg2test);		
+				fgets(inbuf,1024,stdin);
+
+				char* gtrsa64 = (char*)ServerGetUserRSA(inbuf);		
 				puts(gtrsa64);
 				BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
-				char recvbuf[4096];
-				memset(recvbuf,'\0',4096);
-				BIO_read(tls_vars->bio_obj,recvbuf,4096);
-				if(strcmp(recvbuf,"GETRSA_RSP_ERROR") == 0){
-					puts(recvbuf);
+				free(gtrsa64);
+				gtrsa64 = NULL;
+				memset(rxbuf,0,4096);
+				BIO_read(tls_vars->bio_obj,rxbuf,4096);
+				if(strcmp(rxbuf,"GETRSA_RSP_ERROR") == 0){
+					puts(rxbuf);
 				} 
 				else{
 					sqlite3_stmt* stmt;
 					binn* obj;
-					obj = binn_open(base64decode(recvbuf,strlen(recvbuf)));
+					obj = binn_open(base64decode(rxbuf,strlen(rxbuf)));
 					char* rsapub64 = binn_object_str(obj,"b64rsa");
 					int rsalen = binn_object_int32(obj,"rsalen");
 					sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
-					sqlite3_bind_text(stmt,1,msg2test,-1,0);
+					sqlite3_bind_text(stmt,1,inbuf,-1,0);
 					sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
 					sqlite3_bind_int(stmt,3,rsalen);
 					sqlite3_step(stmt);
@@ -141,14 +167,25 @@ int main(void){
 				puts("Getting Messages from Server...");
 				char* buf = (char*)ServerGetMessages(db);
 				BIO_write(tls_vars->bio_obj,buf,strlen(buf));
-				char recvbuf2[200000];
-				BIO_read(tls_vars->bio_obj,recvbuf2,200000);
+				free(buf);
+				buf = NULL;
+				char *recvbuf2 = malloc(20000);
+				BIO_read(tls_vars->bio_obj,recvbuf2,20000);
 				binn *list;
 				list = binn_open(base64decode(recvbuf2,strlen(recvbuf2)));
+				#ifdef SSC_VERIFY_VARIABLES
+				if(list == NULL){
+					puts("No new messages.");
+					break;
+				}
+				#endif
 				int lc = binn_count(list);
 				int i;
 				for(i=1;i<=lc;i++){
 					binn *obj2 = binn_open(base64decode(binn_list_str(list,i),strlen(binn_list_str(list,i))));
+					#ifdef SSC_VERIFY_VARIABLES
+					assert(obj2 != NULL);
+					#endif
 					char* sender = binn_object_str(obj2,"sender");	
 					decbuf = (char*)decryptmsg(binn_list_str(list,i),priv_evp); // decrypt
 					if(decbuf == NULL) goto CLEANUP;		
@@ -189,11 +226,16 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	binn* obj;
 	obj = binn_object();	
 	EVP_PKEY * userpubk = get_pubk_username(username,db);
+	if(userpubk == NULL){
+		puts("Could not get Users Public Key, maybe not in DB?");
+		binn_free(obj);
+		return NULL;
+	}
 	sqlite3_stmt *stmt;
         binn_object_set_str(obj,"recipient",username);
         sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
         if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
-                binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
+            binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
         }
         sqlite3_finalize(stmt);
 
@@ -225,6 +267,9 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	free(ek);
 	free(enc_buf);
 	binn_free(obj);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(final_b64 != NULL);
+	#endif
 	return (const char*)final_b64;
 }
 
@@ -258,6 +303,9 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attem
 
 	char *f_buf = malloc(dec_len);
 	memset(f_buf,0,dec_len);
+	#ifdef SSC_VERIFY_VARIABLES
+	assert((dec_len-1) <= 2000);
+	#endif
 	memcpy(f_buf,dec_buf,dec_len-1);
 	binn_free(obj);
 	free(dec_buf);

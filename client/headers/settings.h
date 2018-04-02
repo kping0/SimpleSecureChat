@@ -14,6 +14,7 @@
 #define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename(Will be generated if not found)
+#define SSC_VERIFY_VARIABLES //Sanity check variables at minimal cost of speed
 
 //Message Purposes
 #define MSGSND 1 //Message Send(normal message)

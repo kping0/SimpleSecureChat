@@ -308,7 +308,7 @@ char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with enco
 
 
 void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills all zombie processes
-	printf("Child exited with Signal id %i\n",sig);
+	sig++; //Just to avoid a compiler warning that sig is unused.
 	int saved_errno = errno;
 	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
 	errno = saved_errno;

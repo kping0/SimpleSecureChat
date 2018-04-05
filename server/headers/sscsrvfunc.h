@@ -24,6 +24,7 @@
 #include "binn.h"
 #include "settings.h"
 
+#define UNUSED(x)((void)x)
 extern int sock;
 
 int create_socket(int port);

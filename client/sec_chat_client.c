@@ -3,7 +3,10 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 
+#include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/crypto.h> 
 #include <openssl/bn.h>
@@ -25,9 +28,19 @@
 //All configurable settings
 #include "headers/settings.h" //Modify to change configuration of SSC
 
+#define UNUSED(x)((void)x)
+
+typedef unsigned char byte; //Create type "byte" NOTE: only when the build system version of type "char" is 8bit
+
 //Prototype functions
-const char* encryptmsg(char* username,unsigned char* message,sqlite3* db); //encrypt buffer message with a public key fetched (index username) from the sqlite3 db (returns encryped buffer)
-const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey); // Attempts to decrypt buffer with your private key
+const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db); //encrypt buffer message with a public key fetched (index username) from the sqlite3 db (returns encryped buffer)
+const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db); // Attempts to decrypt buffer with your private key
+/* Function taken from the OpenSSL wiki */
+
+int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey); //Signs message msg with length of mlen with private key pkey, allocates signature and returns pointer to sig 
+/* Function taken from the OpenSSL wiki */
+
+int verifymsg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey); //Verifies message "msg" with length of "mlen" with signature "sig" and public key "pkey"
 
 //Startpoint
 int main(void){
@@ -79,6 +92,25 @@ int main(void){
 		puts("Usercheck ERROR");
 		goto CLEANUP;
 	}
+/*
+	puts("Starting Signing/Verifying Test");
+	const byte msg[] = "This is a secret message";
+	byte *sig = NULL;
+	size_t slen = 0;
+	int rc = signmsg(msg,sizeof(msg),&sig,&slen,priv_evp);
+	if(rc == 0) {
+       		 printf("Created signature\n");
+    	} else {
+       		 printf("Failed to create signature, return code %d\n", rc);
+   	}
+	rc = verifymsg(msg,sizeof(msg),sig,slen,pubk_evp);
+	if(rc == 0){
+		puts("Verified Signature");
+	}	
+	else{
+		puts("failed to verify signature");
+	}
+*/
 //register your user
 	printf("Your username is: %s, trying to register it with the server\n",getMUSER(db));
 	char* regubuf = (char*)registerUserStr(db);
@@ -122,7 +154,7 @@ int main(void){
 				printf("Message to user: ");
 				fgets(inbuf2,1024,stdin);
 				//sending user
-				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,db); //"user" would be the receiving username
+				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,priv_evp,db); //"user" would be the receiving username
 				#ifdef SSC_VERIFY_VARIABLES
 				assert(encbuf != NULL);
 				#endif	
@@ -187,7 +219,7 @@ int main(void){
 					assert(obj2 != NULL);
 					#endif
 					char* sender = binn_object_str(obj2,"sender");	
-					decbuf = (char*)decryptmsg(binn_list_str(list,i),priv_evp); // decrypt
+					decbuf = (char*)decryptmsg(binn_list_str(list,i),priv_evp,db); // decrypt
 					if(decbuf == NULL) goto CLEANUP;		
 					printf("Decrypted Message from %s: %s\n",sender,decbuf); 
 					binn_free(obj2);
@@ -218,7 +250,7 @@ CLEANUP:
 }
 
 
-const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 	if(strlen((const char*)message) > 1024){
 		puts("Message too long(limit 1024)");
 		return NULL;	
@@ -250,7 +282,23 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	}
 	RAND_poll();
 	unsigned char*enc_buf = malloc(2000);
-	int enc_len = envelope_seal(&userpubk,message,strlen((const char*)message),&ek,&ekl,iv,enc_buf); //encrypt
+	//A Way to impliment the sign-then-encrypt with good context protection
+	binn* sigmsg = binn_object();
+	binn_object_set_str(sigmsg,"msg",message); //Actual message
+	binn_object_set_str(sigmsg,"recipient",username); //Recipient for message
+	byte *sig = NULL;
+	size_t sigl = 0;
+	int rc = signmsg(binn_ptr(sigmsg),binn_size(sigmsg),&sig,&sigl,signingKey); //Create Signature for message+recipient
+	#ifdef SSC_VERIFY_VARIABLES
+	assert(rc == 0);
+	#endif
+	binn* sigmsg2 = binn_object(); //Create Secondary binn_object that will be encrypted
+	binn_object_set_blob(sigmsg2,"sig",sig,sigl);
+	binn_object_set_int32(sigmsg2,"sigl",sigl);
+	binn_object_set_blob(sigmsg2,"binn",binn_ptr(sigmsg),binn_size(sigmsg));
+	binn_object_set_int32(sigmsg2,"binnl",binn_size(sigmsg));
+	//Encrypt message like the following
+	int enc_len = envelope_seal(&userpubk,binn_ptr(sigmsg2),binn_size(sigmsg2),&ek,&ekl,iv,enc_buf);
 	if(enc_len <= 0){
 		puts("Error Encrypting Message!");
 		return NULL;	
@@ -262,11 +310,14 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 	binn_object_set_int32(obj,"enc_len",enc_len);
 	binn_object_set_int32(obj,"iv_len",EVP_MAX_IV_LENGTH);
 	binn_object_set_blob(obj,"iv",iv,EVP_MAX_IV_LENGTH);
+	binn_object_set_str(obj,"test","test");
 	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //encode w base64
 	free(iv);
 	free(ek);
 	free(enc_buf);
 	binn_free(obj);
+	binn_free(sigmsg);
+	binn_free(sigmsg2);
 	#ifdef SSC_VERIFY_VARIABLES
 	assert(final_b64 != NULL);
 	#endif
@@ -274,18 +325,16 @@ const char* encryptmsg(char* username,unsigned char* message,sqlite3* db){ //ret
 }
 
 	
-const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attempts to decrypt buffer with your private key
+const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
 	if(encrypted_buffer == NULL){
 		puts("Error decrypting");
 		return NULL;	
 	}
 	binn* obj;
-	obj = binn_open(base64decode(encrypted_buffer,strlen(encrypted_buffer)));
-	if(obj == NULL){
-		puts("Error decoding binn object.");
-		return NULL;
-	}	
-	
+	byte* deb64encryptedbuffer = base64decode(encrypted_buffer,strlen(encrypted_buffer));
+	obj = binn_open(deb64encryptedbuffer);
+	assert(obj != NULL);
+		
 	int enc_len = binn_object_int32(obj,"enc_len");
 	unsigned char* enc_buf = binn_object_blob(obj,"enc_buf",&enc_len);
 	int ekl = binn_object_int32(obj,"ekl");
@@ -296,19 +345,214 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey){ // Attem
 	memset(dec_buf,0,2000);
 	
 	int dec_len = envelope_open(privKey,enc_buf,enc_len,ek,ekl,iv,dec_buf);
-	if(dec_len <= 0){
-		puts("Error Decrypting error");
-		return NULL;
+	assert(dec_len > 0);
+
+	//Object that includes signature + binn(message+recipient)
+	binn* obj2 = binn_open(dec_buf);
+	assert(obj2 != NULL);
+
+	int serializedobj3l = binn_object_int32(obj2,"binnl");
+	byte* serializedobj3 = binn_object_blob(obj2,"binn",&serializedobj3l);
+	//Object that includes message + recipient
+	binn* obj3 = binn_open(serializedobj3);
+	assert(obj3 != NULL);
+		
+	EVP_PKEY *userpubk = get_pubk_username(binn_object_str(obj,"sender"),db);
+
+	int sigl = binn_object_int32(obj2,"sigl");
+	byte* sig = binn_object_blob(obj2,"sig",&sigl);
+	int rc = verifymsg(serializedobj3,serializedobj3l,sig,sigl,userpubk);
+
+	if(rc == 0){
+		puts("Verified Signature");
+	}	
+	else{
+		puts("failed to verify signature");
 	}
 
-	char *f_buf = malloc(dec_len);
-	memset(f_buf,0,dec_len);
-	#ifdef SSC_VERIFY_VARIABLES
-	assert((dec_len-1) <= 2000);
-	#endif
-	memcpy(f_buf,dec_buf,dec_len-1);
-	binn_free(obj);
+	char* f_buf = binn_object_str(obj3,"msg");
 	free(dec_buf);
+	free(deb64encryptedbuffer);
+	binn_free(obj);
+	binn_free(obj2);
+	binn_free(obj3);
+	EVP_PKEY_free(userpubk);
+	
+	
 	return (const char*)f_buf;
+
+}
+
+int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey)
+{
+    /* Returned to caller */
+    int result = -1;
+    
+    if(!msg || !mlen || !sig || !pkey) {
+        assert(0); return -1;
+    }
+    
+    if(*sig)
+        OPENSSL_free(*sig);
+    
+    *sig = NULL;
+    *slen = 0;
+    
+    EVP_MD_CTX* ctx = NULL;
+    
+    do
+    {
+        ctx = EVP_MD_CTX_create();
+        assert(ctx != NULL);
+        if(ctx == NULL) {
+            printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        const EVP_MD* md = EVP_get_digestbyname("SHA256");
+        assert(md != NULL);
+        if(md == NULL) {
+            printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        int rc = EVP_DigestInit_ex(ctx, md, NULL);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        rc = EVP_DigestSignInit(ctx, NULL, md, NULL, pkey);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        rc = EVP_DigestSignUpdate(ctx, msg, mlen);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        size_t req = 0;
+        rc = EVP_DigestSignFinal(ctx, NULL, &req);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        assert(req > 0);
+        if(!(req > 0)) {
+            printf("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        *sig = OPENSSL_malloc(req);
+        assert(*sig != NULL);
+        if(*sig == NULL) {
+            printf("OPENSSL_malloc failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        *slen = req;
+        rc = EVP_DigestSignFinal(ctx, *sig, slen);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestSignFinal failed (3), return code %d, error 0x%lx\n", rc, ERR_get_error());
+            break; /* failed */
+        }
+        
+        assert(req == *slen);
+        if(rc != 1) {
+            printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, *slen);
+            break; /* failed */
+        }
+        
+        result = 0;
+        
+    } while(0);
+    
+    if(ctx) {
+        EVP_MD_CTX_destroy(ctx);
+        ctx = NULL;
+    }
+    
+    return !!result;
+}
+
+int verifymsg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey)
+{
+    /* Returned to caller */
+    int result = -1;
+    
+    if(!msg || !mlen || !sig || !slen || !pkey) {
+        assert(0);
+        return -1;
+    }
+    
+    EVP_MD_CTX* ctx = NULL;
+    
+    do
+    {
+        ctx = EVP_MD_CTX_create();
+        assert(ctx != NULL);
+        if(ctx == NULL) {
+            printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        const EVP_MD* md = EVP_get_digestbyname("SHA256");
+        assert(md != NULL);
+        if(md == NULL) {
+            printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        int rc = EVP_DigestInit_ex(ctx, md, NULL);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        rc = EVP_DigestVerifyInit(ctx, NULL, md, NULL, pkey);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestVerifyInit failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        rc = EVP_DigestVerifyUpdate(ctx, msg, mlen);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestVerifyUpdate failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        /* Clear any errors for the call below */
+        ERR_clear_error();
+        
+        rc = EVP_DigestVerifyFinal(ctx, sig, slen);
+        assert(rc == 1);
+        if(rc != 1) {
+            printf("EVP_DigestVerifyFinal failed, error 0x%lx\n", ERR_get_error());
+            break; /* failed */
+        }
+        
+        result = 0;
+        
+    } while(0);
+    
+    if(ctx) {
+        EVP_MD_CTX_destroy(ctx);
+        ctx = NULL;
+    }
+    
+    return !!result;
+
 }
 

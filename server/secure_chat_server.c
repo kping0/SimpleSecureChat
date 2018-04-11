@@ -64,6 +64,7 @@ int main(void){
 	*/
 	pid_t pid = fork();
 	if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 
+	signal(SIGINT,SIG_DFL);
         if (client < 0) {
             perror("Unable to accept");
             exit(EXIT_FAILURE);

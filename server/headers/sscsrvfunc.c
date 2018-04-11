@@ -169,10 +169,7 @@ char *base64decode (const void *b64_decode_this, int decode_this_many_bytes){
 void sig_handler(int sig){ //Function to handle signals
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
 			printf("\nCaught Signal... Exiting\n");
-			if(sock != 0){
-				close(sock);
-				sock = 0;
-			}	
+			close(sock);
 			exit(EXIT_SUCCESS);
 		}
 		else if(sig == SIGFPE){
@@ -308,7 +305,7 @@ char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with enco
 
 
 void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills all zombie processes
-	sig++; //Just to avoid a compiler warning that sig is unused.
+	(void)sig;
 	int saved_errno = errno;
 	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
 	errno = saved_errno;
@@ -316,8 +313,7 @@ void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills al
 
 char* getUserAuthKey(char* username, sqlite3* db){
 	sqlite3_stmt* stmt = NULL;
-	unsigned char* authkey = malloc(256); 
-	memset(authkey,0,256);
+	unsigned char* authkey = calloc(1,256); 
 	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=?1;",-1,&stmt,NULL);
 	int uid = getUserUID(username,db);
 	sqlite3_bind_int(stmt,1,uid);

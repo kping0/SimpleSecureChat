@@ -22,6 +22,7 @@
 #include "headers/binn.h" //Binn library 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 #include "headers/settings.h" //settings for ssc
+#include "headers/base64.h" //MIT base64 function (BSD LICENSE)
 
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 

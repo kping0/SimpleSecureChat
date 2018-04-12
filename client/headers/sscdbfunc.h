@@ -18,10 +18,7 @@
 #include <sqlite3.h> 
 
 #include "settings.h"
-
-char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
-
-char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
+#include "base64.h"
 
 sqlite3* initDB(char* dbfname);
 

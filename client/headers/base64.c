@@ -35,14 +35,11 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 	olen++; /* nul termination */
 	if (olen < len)
 		return NULL; /* integer overflow */
-	out = malloc(olen);
-	if (out == NULL)
-		return NULL;
+	out = malloc(olen); if (out == NULL) return NULL;
 
 	end = src + len;
 	in = src;
 	pos = out;
-	line_len = 0;
 	while (end - in >= 3) {
 		*pos++ = base64_table[(in[0] >> 2) & 0x3f];
 		*pos++ = base64_table[(((in[0] & 0x03) << 4) |
@@ -51,11 +48,6 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 				       (in[2] >> 6)) & 0x3f];
 		*pos++ = base64_table[in[2] & 0x3f];
 		in += 3;
-		line_len += 4;
-		if (line_len >= 72) {
-			*pos++ = '\n';
-			line_len = 0;
-		}
 	}
 
 	if (end - in) {
@@ -69,11 +61,7 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 			*pos++ = base64_table[((in[1] & 0x0f) << 2) & 0x3f];
 		}
 		*pos++ = '=';
-		line_len += 4;
 	}
-
-	if (line_len)
-		*pos++ = '\n';
 
 	*pos = '\0';
 	if (out_len)
@@ -151,4 +139,16 @@ unsigned char * base64_decode(const unsigned char *src, size_t len,
 	*out_len = pos - out;
 	return out;
 }
-
+/*
+* Wrappers around the above to avoid rewriting alot of code
+*/
+unsigned char* base64encode(char *src,size_t len){
+	size_t enclen;
+	unsigned char* encoded = base64_encode((const unsigned char*)src,len,&enclen);
+	return encoded;
+}
+unsigned char* base64decode(char *src,size_t len){
+	size_t declen;
+	unsigned char* decoded = base64_decode((const unsigned char*)src,len,&declen);
+	return decoded;
+}

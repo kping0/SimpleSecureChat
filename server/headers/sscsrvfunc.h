@@ -41,10 +41,6 @@ int checkforUser(char* username,sqlite3* db);
 
 int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db);
 	
-char *base64encode (const void *b64_encode_this, int encode_this_many_bytes);
-
-char *base64decode (const void *b64_decode_this, int decode_this_many_bytes);
-
 void sig_handler(int sig);
 
 void childexit_handler(int sig);

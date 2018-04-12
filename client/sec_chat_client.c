@@ -23,8 +23,9 @@
 #include "headers/binn.h" //Binn library 
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
-#include "headers/sscdbfunc.h" //DB manipulation functions & B64
-
+#include "headers/sscdbfunc.h" //DB manipulation functions 
+#include "headers/base64.h" //Base64 Functions
+#include "headers/serialization.h" //SimpleSecureSerialization library (to replace binn)
 //All configurable settings
 #include "headers/settings.h" //Modify to change configuration of SSC
 

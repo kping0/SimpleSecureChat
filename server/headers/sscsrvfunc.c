@@ -130,42 +130,6 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db)
 	return 1;	
 
 }
-	
-char *base64encode (const void *b64_encode_this, int encode_this_many_bytes){
-    BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
-    BUF_MEM *mem_bio_mem_ptr;    //Pointer to a "memory BIO" structure holding our base64 data.
-    b64_bio = BIO_new(BIO_f_base64());                      //Initialize our base64 filter BIO.
-    mem_bio = BIO_new(BIO_s_mem());                           //Initialize our memory sink BIO.
-    BIO_push(b64_bio, mem_bio);            //Link the BIOs by creating a filter-sink BIO chain.
-    BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL);  //No newlines every 64 characters or less.
-    BIO_write(b64_bio, b64_encode_this, encode_this_many_bytes); //Records base64 encoded data.
-    BIO_flush(b64_bio);   //Flush data.  Necessary for b64 encoding, because of pad characters.
-    BIO_get_mem_ptr(mem_bio, &mem_bio_mem_ptr);  //Store address of mem_bio's memory structure.
-    BIO_set_close(mem_bio, BIO_NOCLOSE);   //Permit access to mem_ptr after BIOs are destroyed.
-    BIO_free_all(b64_bio);  //Destroys all BIOs in chain, starting with b64 (i.e. the 1st one).
-    BUF_MEM_grow(mem_bio_mem_ptr, (*mem_bio_mem_ptr).length + 1);   //Makes space for end null.
-    (*mem_bio_mem_ptr).data[(*mem_bio_mem_ptr).length] = '\0';  //Adds null-terminator to tail.
-    return (*mem_bio_mem_ptr).data; //Returns base-64 encoded data. (See: "buf_mem_st" struct).
-}
-
-/* https://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c */
-char *base64decode (const void *b64_decode_this, int decode_this_many_bytes){
-    BIO *b64_bio, *mem_bio;      //Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
-    char *base64_decoded = calloc( (decode_this_many_bytes*3)/4+1, sizeof(char) ); //+1 = null.
-    b64_bio = BIO_new(BIO_f_base64());                      //Initialize our base64 filter BIO.
-    mem_bio = BIO_new(BIO_s_mem());                         //Initialize our memory source BIO.
-    BIO_write(mem_bio, b64_decode_this, decode_this_many_bytes); //Base64 data saved in source.
-    BIO_push(b64_bio, mem_bio);          //Link the BIOs by creating a filter-source BIO chain.
-    BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL);          //Don't require trailing newlines.
-    int decoded_byte_index = 0;   //Index where the next base64_decoded byte should be written.
-    while ( 0 < BIO_read(b64_bio, base64_decoded+decoded_byte_index, 1) ){ //Read byte-by-byte.
-        decoded_byte_index++; //Increment the index until read of BIO decoded data is complete.
-    } //Once we're done reading decoded data, BIO_read returns -1 even though there's no error.
-    BIO_free_all(b64_bio);  //Destroys all BIOs in chain, starting with b64 (i.e. the 1st one).
-    return base64_decoded;        //Returns base-64 decoded data with trailing null terminator.
-}
-
-
 void sig_handler(int sig){ //Function to handle signals
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
 			printf("\nCaught Signal... Exiting\n");
@@ -200,6 +164,10 @@ int getUserUID(char* username,sqlite3 *db){ //gets uid for the username it is pa
 }
 
 int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
+	/*
+	* problem: messages to other users are not added (!SQLITE_DONE)
+	*/
+	puts(message);
 	sqlite3_stmt *stmt = NULL;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,recvuid,message)values(NULL,?1,?2);",-1,&stmt,NULL);
 	int recvuid = getUserUID(recipient,db);
@@ -212,7 +180,9 @@ int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a mess
 	#ifdef SSC_VERIFY_VARIABLES
 	assert(stmt != NULL);
 	#endif
-	sqlite3_step(stmt);
+	if(sqlite3_step(stmt) != SQLITE_DONE){
+		puts("Error adding message");
+	}
 	sqlite3_finalize(stmt);
 	stmt = NULL;
 	return 1;
@@ -255,8 +225,7 @@ sqlite3* initDB(char* dbfname){ //Initalize the Mysql Database and create the ta
 
 
 const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns an encoded user RSA key.
-	binn* obj;
-	obj = binn_object();
+	sscso* obj = SSCS_object();
 	char* newline = strchr(username,'\n');
 	if( newline ) *newline = 0;
 	sqlite3_stmt* stmt = NULL;
@@ -271,23 +240,21 @@ const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns
 	}
 	char* rsapub64 = (char*)sqlite3_column_text(stmt,0);
 	int rsalen = sqlite3_column_int(stmt,1);
-	binn_object_set_int32(obj,"msgp",GETRSA_RSP);
-	binn_object_set_str(obj,"b64rsa",rsapub64);
-	binn_object_set_int32(obj,"rsalen",rsalen);
-	sqlite3_finalize(stmt);
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
-	#ifdef SSC_VERIFY_VARIABLES 
-	assert(strlen(final_b64) > 0);
-	#endif
-	binn_free(obj);
-	return final_b64;
+	printf("Length returned by GetEncodedRSA is %i (key %s)\n",rsalen,rsapub64);
+	int messagep = GETRSA_RSP;
+	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"b64rsa",rsapub64,strlen(rsapub64));
+	SSCS_object_add_data(obj,"rsalen",&rsalen,sizeof(int));
+	const char* retptr = SSCS_object_encoded(obj);
+	SSCS_release(&obj);
+	return retptr;
+
 }
 
 
 char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with encoded user messages
 	sqlite3_stmt* stmt = NULL;
-	binn* list;
-	list = binn_list();
+	sscsl* list = SSCS_list();
 	sqlite3_prepare_v2(db,"select message from messages where recvuid=?1;",-1,&stmt,NULL);
 	int uid = getUserUID(username,db);
 	sqlite3_bind_int(stmt,1,uid);
@@ -295,12 +262,13 @@ char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with enco
 	assert(stmt != NULL);
 	#endif
 	while(sqlite3_step(stmt) == SQLITE_ROW){
-		binn_list_add_str(list,(char*)sqlite3_column_text(stmt,0));
+		char* msg = sqlite3_column_text(stmt,0);
+		SSCS_list_add_data(list,msg,strlen(msg));
 	}
 	sqlite3_finalize(stmt);
-	char* usermsgbuf64 = base64encode(binn_ptr(list),binn_size(list));
-	binn_free(list);
-	return usermsgbuf64;
+	char* retptr = SSCS_list_encoded(list);
+	SSCS_list_release(&list);
+	return retptr;
 }
 
 
@@ -322,7 +290,8 @@ char* getUserAuthKey(char* username, sqlite3* db){
 	#endif
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		const char* sqlqueryret = (const char*)sqlite3_column_text(stmt,0);
-		if(strlen(sqlqueryret) != 256){
+		if(strlen(sqlqueryret) < 256){
+			printf("Stored Authkey length less than 256, it is %i\n",strlen(sqlqueryret));		
 			sqlite3_finalize(stmt);
 			return NULL;
 		}

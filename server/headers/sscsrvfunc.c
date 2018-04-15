@@ -20,7 +20,6 @@
 #include <sqlite3.h>
 
 #include "sscsrvfunc.h"
-#include "base64.h"
 
 int create_socket(int port){
     int s = 0;
@@ -165,6 +164,10 @@ int getUserUID(char* username,sqlite3 *db){ //gets uid for the username it is pa
 }
 
 int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
+	/*
+	* problem: messages to other users are not added (!SQLITE_DONE)
+	*/
+	puts(message);
 	sqlite3_stmt *stmt = NULL;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,recvuid,message)values(NULL,?1,?2);",-1,&stmt,NULL);
 	int recvuid = getUserUID(recipient,db);
@@ -177,7 +180,9 @@ int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message){ //Adds a mess
 	#ifdef SSC_VERIFY_VARIABLES
 	assert(stmt != NULL);
 	#endif
-	sqlite3_step(stmt);
+	if(sqlite3_step(stmt) != SQLITE_DONE){
+		puts("Error adding message");
+	}
 	sqlite3_finalize(stmt);
 	stmt = NULL;
 	return 1;
@@ -220,8 +225,7 @@ sqlite3* initDB(char* dbfname){ //Initalize the Mysql Database and create the ta
 
 
 const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns an encoded user RSA key.
-	binn* obj;
-	obj = binn_object();
+	sscso* obj = SSCS_object();
 	char* newline = strchr(username,'\n');
 	if( newline ) *newline = 0;
 	sqlite3_stmt* stmt = NULL;
@@ -236,23 +240,21 @@ const char* GetEncodedRSA(char* username, sqlite3* db){ //Functions that returns
 	}
 	char* rsapub64 = (char*)sqlite3_column_text(stmt,0);
 	int rsalen = sqlite3_column_int(stmt,1);
-	binn_object_set_int32(obj,"msgp",GETRSA_RSP);
-	binn_object_set_str(obj,"b64rsa",rsapub64);
-	binn_object_set_int32(obj,"rsalen",rsalen);
-	sqlite3_finalize(stmt);
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
-	#ifdef SSC_VERIFY_VARIABLES 
-	assert(strlen(final_b64) > 0);
-	#endif
-	binn_free(obj);
-	return final_b64;
+	printf("Length returned by GetEncodedRSA is %i (key %s)\n",rsalen,rsapub64);
+	int messagep = GETRSA_RSP;
+	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"b64rsa",rsapub64,strlen(rsapub64));
+	SSCS_object_add_data(obj,"rsalen",&rsalen,sizeof(int));
+	const char* retptr = SSCS_object_encoded(obj);
+	SSCS_release(&obj);
+	return retptr;
+
 }
 
 
 char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with encoded user messages
 	sqlite3_stmt* stmt = NULL;
-	binn* list;
-	list = binn_list();
+	sscsl* list = SSCS_list();
 	sqlite3_prepare_v2(db,"select message from messages where recvuid=?1;",-1,&stmt,NULL);
 	int uid = getUserUID(username,db);
 	sqlite3_bind_int(stmt,1,uid);
@@ -260,12 +262,13 @@ char* GetUserMessagesSRV(char* username,sqlite3* db){ //Returns buffer with enco
 	assert(stmt != NULL);
 	#endif
 	while(sqlite3_step(stmt) == SQLITE_ROW){
-		binn_list_add_str(list,(char*)sqlite3_column_text(stmt,0));
+		char* msg = sqlite3_column_text(stmt,0);
+		SSCS_list_add_data(list,msg,strlen(msg));
 	}
 	sqlite3_finalize(stmt);
-	char* usermsgbuf64 = base64encode(binn_ptr(list),binn_size(list));
-	binn_free(list);
-	return usermsgbuf64;
+	char* retptr = SSCS_list_encoded(list);
+	SSCS_list_release(&list);
+	return retptr;
 }
 
 
@@ -287,7 +290,8 @@ char* getUserAuthKey(char* username, sqlite3* db){
 	#endif
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		const char* sqlqueryret = (const char*)sqlite3_column_text(stmt,0);
-		if(strlen(sqlqueryret) != 256){
+		if(strlen(sqlqueryret) < 256){
+			printf("Stored Authkey length less than 256, it is %i\n",strlen(sqlqueryret));		
 			sqlite3_finalize(stmt);
 			return NULL;
 		}

@@ -19,10 +19,10 @@
 #include <openssl/rand.h> 
 #include <sqlite3.h>
 
-#include "headers/binn.h" //Binn library 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 #include "headers/settings.h" //settings for ssc
-
+#include "headers/base64.h" //MIT base64 function (BSD LICENSE)
+#include "headers/serialization.h" //SSCS Library
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 int main(void){
@@ -86,7 +86,6 @@ int main(void){
 	assert(ssl != NULL);
 	#endif
 	char* buf = malloc(4096); //Main receive buffer for receiving from SSL socket
-	char* sbinnobj = NULL;
 	while(1){ //Handle request until interrupt or connection problems	
 		memset(buf,'\0',4096);
         	int r = SSL_read(ssl,buf, 4095); 
@@ -99,17 +98,13 @@ int main(void){
             		default: 
                 		goto end;
             	}
+//		printf("Buffer is %s\n",buf);
+		sscso* obj0 = SSCS_open(buf);
+		int msgp0  = SSCS_object_int(obj0,"msgp");
+//		printf("message arrived with message purpose %i\n",msgp0);
 
-		sbinnobj = base64decode(buf,strlen(buf));
-		#ifdef SSC_VERIFY_VARIABLES
-		assert(sbinnobj != NULL);
-		#endif
-		binn* obj0 = binn_open(sbinnobj);
-		if(obj0 == NULL) goto end;
-
-		int msgp0 = binn_object_int32(obj0,"msgp");
 		if(msgp0 == REGRSA){ //User wants to register a username with a public key
-			char* rusername = binn_object_str(obj0,"rusername");
+			char* rusername = SSCS_object_string(obj0,"rusername");
 			char* newline = strchr(rusername,'\n');
 			if( newline ) *newline = 0;
 	
@@ -118,24 +113,39 @@ int main(void){
 			}
 			else{
 				puts("inserting user into db");
-				char* b64rsa = binn_object_str(obj0,"b64rsa");
-				int rsalen = binn_object_int32(obj0,"rsalen");
-				char* authkey = binn_object_str(obj0,"authkey");
-				if(strlen(authkey) != 256) goto end;
+				char* b64rsa = SSCS_object_string(obj0,"b64rsa");
+				int rsalen = SSCS_object_int(obj0,"rsalen");
+				char* authkey = SSCS_object_string(obj0,"authkey");
+				//if(strlen(authkey) != 256) goto end;
 				if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
 					puts("error inserting user");
+				}
+				else{
+					puts("added user");
 				}
 			}
 		}
 		else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
 			puts("User wants to authenticate, handling...");
-			char* userauthk = (char*)binn_object_str(obj0,"authkey");
-			if(strlen(userauthk) != 256) goto end; //If supplied authkey is not 256B exit
-			char* authusername = (char*)binn_object_str(obj0,"username");
+			char* userauthk = SSCS_object_string(obj0,"authkey");
+			if(strlen(userauthk) < 256){
+				printf("Supplied Authkey smaller 256, it is %i",strlen(userauthk));
+				goto end;
+			}
+			char* authusername = SSCS_object_string(obj0,"username");
 			char* userauthk_db = getUserAuthKey(authusername,db);
-			if(memcmp(userauthk_db,userauthk,256) == 0){ //Compare stored authkey to usersupplied authkey
+			//printf("User %s with supplied authkey %s with len %iis trying to auth, comparing with %s\n",authusername,userauthk,strlen(userauthk),userauthk_db);
+			//Problem: getUserAuthKey returns NULL
+			if(userauthk_db == NULL){
+				puts("userauthk_db == NULL, exiting");
+				goto end;
+			}
+			int memcmpres = memcmp(userauthk_db,userauthk,256);
+
+//			printf("Memory compare resulted in %i\n",memcmpres);
+			if(memcmpres == 0){ //Compare stored authkey to usersupplied authkey
 				printf("User %s authenticated.\n",authusername);
-				binn_free(obj0);
+				SSCS_release(&obj0);
 				free(userauthk_db);
 				userauthk_db = NULL; //for sanities sake set to NULL
 				while(1){
@@ -150,40 +160,36 @@ int main(void){
 						goto end;
 				    	}
 					buf[4095] = '\0';
-					sbinnobj = base64decode(buf,strlen(buf));
-					binn* obj = binn_open(sbinnobj);
-					#ifdef SSC_VERIFY_VARIABLES
-					if(obj == NULL) goto end;
-					#endif
-					int msgp = binn_object_int32(obj,"msgp");
+					sscso* obj = SSCS_open(buf);
+					int msgp = SSCS_object_int(obj,"msgp");
 					/*
 					* Important Functions are only accessible when user has authenticated.
 					*/
 					if(msgp == GETRSA){ //Client is requesting a User Public Key
 						puts("Client Requested Public Key,handling...");
-						char* rsausername = binn_object_str(obj,"username");
+						char* rsausername = SSCS_object_string(obj,"username");
 						const char* uRSAenc = GetEncodedRSA(rsausername,db);
+					//	printf("Sending buffer %s\n",uRSAenc);
 						if(uRSAenc != NULL) SSL_write(ssl,uRSAenc,strlen(uRSAenc));
+						free(rsausername);
 					}
 					else if(msgp == MSGREC){ //Client is requesting stored messages
 						puts("Client Requesting New Messages,handling...");
 						char* retmsg = GetUserMessagesSRV(authusername,db);
 						printf("Length of message is %d\n",(int)strlen(retmsg));
-						if(retmsg != NULL) SSL_write(ssl,retmsg,strlen(retmsg));
+						if(retmsg) SSL_write(ssl,retmsg,strlen(retmsg));
+						if(!retmsg)SSL_write(ssl,"ERROR",5);
 						//call function that returns an int,(messages available)send it to the client,and then send i messages to client in while() loop. 
 					}
 					else if(msgp == MSGSND){ //User wants to send a message to a user
 						char* recipient = NULL;
-						recipient = binn_object_str(obj,"recipient");
-						char* sender = NULL;
-						sender = binn_object_str(obj,"sender");
-						if(strcmp(sender,authusername) != 0){
-							puts("User tried to send a message with a fake username!");
-							goto end;
-						}	
+						recipient = SSCS_object_string(obj,"recipient");
+						if(!recipient)goto end;
+						if(SSCS_object_string(obj,"sender") != NULL)goto end;
+						SSCS_object_add_data(obj,"sender",authusername,strlen(authusername));
 						char* newline = strchr(recipient,'\n');
 						if( newline ) *newline = 0;
-						char* b64modbuf = base64encode(binn_ptr(obj),binn_size(obj));	
+						char* b64modbuf = obj->buf_ptr;
 						#ifdef SSC_VERIFY_VARIABLES
 						if(recipient == NULL)goto end;
 						#endif
@@ -193,9 +199,7 @@ int main(void){
 						}				
 					}
 
-					binn_free(obj);
-					free(sbinnobj);
-					sbinnobj = NULL; //for sanity reasons set to NULL
+					SSCS_release(&obj);
 				}
 			}
 			else{
@@ -204,11 +208,11 @@ int main(void){
 				userauthk_db = NULL; //for sanities sake
 			}	
 		}
+		else{
+			puts("Message received with no specific purpose");
+		}
 
-		binn_free(obj0);
-		obj0 = NULL;
-		free(sbinnobj);
-		sbinnobj = NULL; //for sanity reasons set to NULL
+		SSCS_release(&obj0);
 	}
 end: //cleanup & exit
 	puts("Ending Client Session");

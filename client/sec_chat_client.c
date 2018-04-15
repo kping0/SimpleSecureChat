@@ -20,12 +20,12 @@
 #include <sqlite3.h> 
 
 //Custom function headers
-#include "headers/binn.h" //Binn library 
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
 #include "headers/sscdbfunc.h" //DB manipulation functions 
 #include "headers/base64.h" //Base64 Functions
 #include "headers/serialization.h" //SimpleSecureSerialization library (to replace binn)
+
 //All configurable settings
 #include "headers/settings.h" //Modify to change configuration of SSC
 
@@ -43,6 +43,10 @@ int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pk
 
 int verifymsg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey); //Verifies message "msg" with length of "mlen" with signature "sig" and public key "pkey"
 
+int pexit(char* error){
+	printf("Exiting, error : %s\n",error);
+	exit(1);
+}
 //Startpoint
 int main(void){
 	puts("Starting secure chat application...");
@@ -93,7 +97,7 @@ int main(void){
 		puts("Usercheck ERROR");
 		goto CLEANUP;
 	}
-/*
+#ifdef DEBUG
 	puts("Starting Signing/Verifying Test");
 	const byte msg[] = "This is a secret message";
 	byte *sig = NULL;
@@ -111,8 +115,18 @@ int main(void){
 	else{
 		puts("failed to verify signature");
 	}
-*/
+#endif
+	
+//test
+#ifdef DEBUG
+	sscso* obj = SSCS_object();
+	int testint = 45;
+	SSCS_object_add_data(obj,"msgp",&testint,sizeof(int));
+	BIO_write(tls_vars->bio_obj,SSCS_object_encoded(obj),SSCS_object_encoded_size(obj));
+	BIO_write(tls_vars->bio_obj,SSCS_object_encoded(obj),SSCS_object_encoded_size(obj));
+#endif
 //register your user
+
 	printf("Your username is: %s, trying to register it with the server\n",getMUSER(db));
 	char* regubuf = (char*)registerUserStr(db);
 	#ifdef SSC_VERIFY_VARIABLES
@@ -156,9 +170,9 @@ int main(void){
 				fgets(inbuf2,1024,stdin);
 				//sending user
 				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,priv_evp,db); //"user" would be the receiving username
-				#ifdef SSC_VERIFY_VARIABLES
-				assert(encbuf != NULL);
-				#endif	
+				if(encbuf == NULL){
+					break;
+				}
 				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
 				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
 				free(encbuf);
@@ -171,7 +185,6 @@ int main(void){
 				fgets(inbuf,1024,stdin);
 
 				char* gtrsa64 = (char*)ServerGetUserRSA(inbuf);		
-				puts(gtrsa64);
 				BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
 				free(gtrsa64);
 				gtrsa64 = NULL;
@@ -182,17 +195,23 @@ int main(void){
 				} 
 				else{
 					sqlite3_stmt* stmt;
-					binn* obj;
-					obj = binn_open(base64decode(rxbuf,strlen(rxbuf)));
-					char* rsapub64 = binn_object_str(obj,"b64rsa");
-					int rsalen = binn_object_int32(obj,"rsalen");
+					sscso* obj = SSCS_open(rxbuf);
+					//sscsd* data = SSCS_object_data(obj,"b64rsa");
+					//if(data == NULL)pexit("data was NULL");
+					//char* rsapub64 = data->data;
+					char* rsapub64 = SSCS_object_string(obj,"b64rsa");
+//					int rsalen = data->len; //This is where the error lies(this is not  the length of the length needed for d21_public key function
+					int rsalen = SSCS_object_int(obj,"rsalen");
+//					printf("user %s got %s len %i \n",inbuf,rsapub64,rsalen);
 					sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
 					sqlite3_bind_text(stmt,1,inbuf,-1,0);
 					sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
 					sqlite3_bind_int(stmt,3,rsalen);
 					sqlite3_step(stmt);
 					sqlite3_finalize(stmt);
-					binn_free(obj);
+				//	SSCS_data_release(&data);
+					SSCS_release(&obj);
+							
 				}
 				break;
 
@@ -204,30 +223,25 @@ int main(void){
 				buf = NULL;
 				char *recvbuf2 = malloc(20000);
 				BIO_read(tls_vars->bio_obj,recvbuf2,20000);
-				binn *list;
-				list = binn_open(base64decode(recvbuf2,strlen(recvbuf2)));
-				#ifdef SSC_VERIFY_VARIABLES
-				if(list == NULL){
-					puts("No new messages.");
-					break;
+				if(strcmp(recvbuf2,"ERROR") == 0)break;
+				sscsl* list = SSCS_list_open(recvbuf2);
+				int i = 0;
+				while(1){
+					i++;	
+					sscsd* prebuf =	SSCS_list_data(list,i);	
+					if(prebuf == NULL)break;
+					//printf("Got message (index %i) %s\n",i,prebuf->data);
+					sscso* obj2 = SSCS_open(prebuf->data);
+					SSCS_data_release(&prebuf);
+					char* sender = SSCS_object_string(obj2,"sender");
+					//if(sender == NULL)pexit("did not find label sender");
+					decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	
+					if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
+					SSCS_release(&obj2);
+					free(sender);
+					if(decbuf)free(decbuf);
 				}
-				#endif
-				int lc = binn_count(list);
-				int i;
-				for(i=1;i<=lc;i++){
-					binn *obj2 = binn_open(base64decode(binn_list_str(list,i),strlen(binn_list_str(list,i))));
-					#ifdef SSC_VERIFY_VARIABLES
-					assert(obj2 != NULL);
-					#endif
-					char* sender = binn_object_str(obj2,"sender");	
-					decbuf = (char*)decryptmsg(binn_list_str(list,i),priv_evp,db); // decrypt
-					if(decbuf == NULL) goto CLEANUP;		
-					printf("Decrypted Message from %s: %s\n",sender,decbuf); 
-					binn_free(obj2);
-					obj2 = NULL;
-				}
-				binn_free(list);
-				list = NULL;
+				SSCS_list_release(&list);
 				break;
 		default: //Do nothing
 				break;
@@ -256,22 +270,16 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 		puts("Message too long(limit 1024)");
 		return NULL;	
 	}
-	binn* obj;
-	obj = binn_object();	
-	EVP_PKEY * userpubk = get_pubk_username(username,db);
+	sscso* obj = SSCS_object();
+	SSCS_object_add_data(obj,"recipient",username,strlen(username));
+	EVP_PKEY* userpubk = get_pubk_username(username,db);
 	if(userpubk == NULL){
 		puts("Could not get Users Public Key, maybe not in DB?");
-		binn_free(obj);
+		SSCS_release(&obj);
+		EVP_PKEY_free(userpubk);
 		return NULL;
 	}
-	sqlite3_stmt *stmt;
-        binn_object_set_str(obj,"recipient",username);
-        sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
-        if(sqlite3_step(stmt) == SQLITE_ROW){ //get your own username & add it to obj
-            binn_object_set_str(obj,"sender",(char*)sqlite3_column_text(stmt,0));
-        }
-        sqlite3_finalize(stmt);
-
+	
 	unsigned char* ek = malloc(EVP_PKEY_size(userpubk));
 	int ekl = EVP_PKEY_size(userpubk); 
 
@@ -284,45 +292,49 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 	RAND_poll();
 	unsigned char*enc_buf = malloc(2000);
 	//A Way to impliment the sign-then-encrypt with good context protection
-	binn* sigmsg = binn_object();
-	binn_object_set_str(sigmsg,"msg",message); //Actual message
-	binn_object_set_str(sigmsg,"recipient",username); //Recipient for message
+
+	sscso* sigmsg = SSCS_object();
+	SSCS_object_add_data(sigmsg,"msg",(byte*)message,strlen(message));
+	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen(username));
 	byte *sig = NULL;
 	size_t sigl = 0;
-	int rc = signmsg(binn_ptr(sigmsg),binn_size(sigmsg),&sig,&sigl,signingKey); //Create Signature for message+recipient
-	#ifdef SSC_VERIFY_VARIABLES
-	assert(rc == 0);
-	#endif
-	binn* sigmsg2 = binn_object(); //Create Secondary binn_object that will be encrypted
-	binn_object_set_blob(sigmsg2,"sig",sig,sigl);
-	binn_object_set_int32(sigmsg2,"sigl",sigl);
-	binn_object_set_blob(sigmsg2,"binn",binn_ptr(sigmsg),binn_size(sigmsg));
-	binn_object_set_int32(sigmsg2,"binnl",binn_size(sigmsg));
-	//Encrypt message like the following
-	int enc_len = envelope_seal(&userpubk,binn_ptr(sigmsg2),binn_size(sigmsg2),&ek,&ekl,iv,enc_buf);
+	int rc = signmsg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
+	if(!(rc == 0)){
+		puts("error signing message");
+		SSCS_release(&sigmsg);
+		SSCS_release(&obj);
+		free(iv);
+		free(ek);
+		free(enc_buf);
+		free(sig);
+		EVP_PKEY_free(userpubk);
+		return NULL;	
+	}
+	sscso* sigmsg2 = SSCS_object();
+	SSCS_object_add_data(sigmsg2,"sig",sig,sigl);
+	SSCS_object_add_data(sigmsg2,"sscso",(byte*)sigmsg->buf_ptr,sigmsg->allocated);
+	//Encrypt message 
+	int enc_len = envelope_seal(&userpubk,SSCS_object_encoded(sigmsg2),SSCS_object_encoded_size(sigmsg2),&ek,&ekl,iv,enc_buf);
 	if(enc_len <= 0){
 		puts("Error Encrypting Message!");
 		return NULL;	
 	}
-	binn_object_set_int32(obj,"msgp",MSGSND);
-	binn_object_set_blob(obj,"ek",ek,ekl);
-	binn_object_set_int32(obj,"ekl",ekl);
-	binn_object_set_blob(obj,"enc_buf",enc_buf,enc_len);
-	binn_object_set_int32(obj,"enc_len",enc_len);
-	binn_object_set_int32(obj,"iv_len",EVP_MAX_IV_LENGTH);
-	binn_object_set_blob(obj,"iv",iv,EVP_MAX_IV_LENGTH);
-	binn_object_set_str(obj,"test","test");
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //encode w base64
+	int message_purpose = MSGSND;
+	SSCS_object_add_data(obj,"msgp",&message_purpose,sizeof(int));
+	SSCS_object_add_data(obj,"ek",ek,ekl);
+	SSCS_object_add_data(obj,"enc_buf",enc_buf,enc_len);
+	SSCS_object_add_data(obj,"iv",iv,EVP_MAX_IV_LENGTH);
+	const char* retptr = SSCS_object_encoded(obj);
+	//cleanup memory
+	SSCS_release(&obj);
+	SSCS_release(&sigmsg);
+	SSCS_release(&sigmsg2);
 	free(iv);
 	free(ek);
 	free(enc_buf);
-	binn_free(obj);
-	binn_free(sigmsg);
-	binn_free(sigmsg2);
-	#ifdef SSC_VERIFY_VARIABLES
-	assert(final_b64 != NULL);
-	#endif
-	return (const char*)final_b64;
+	EVP_PKEY_free(userpubk);	
+
+	return retptr;
 }
 
 	
@@ -331,37 +343,61 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 		puts("Error decrypting");
 		return NULL;	
 	}
-	binn* obj;
-	byte* deb64encryptedbuffer = base64decode(encrypted_buffer,strlen(encrypted_buffer));
-	obj = binn_open(deb64encryptedbuffer);
-	assert(obj != NULL);
-		
-	int enc_len = binn_object_int32(obj,"enc_len");
-	unsigned char* enc_buf = binn_object_blob(obj,"enc_buf",&enc_len);
-	int ekl = binn_object_int32(obj,"ekl");
-	unsigned char* ek = binn_object_blob(obj,"ek",&ekl);
-	int iv_len = binn_object_int32(obj,"iv_len");
-	unsigned char* iv = binn_object_blob(obj,"iv",&iv_len);	
+	
+	sscso* obj = SSCS_open(encrypted_buffer);
+
+	sscsd* enc_buf_data = SSCS_object_data(obj,"enc_buf");
+	byte* enc_buf = enc_buf_data->data;
+	int enc_len = enc_buf_data->len;
+	sscsd* ek_data = SSCS_object_data(obj,"ek");
+	byte* ek = ek_data->data;
+	int ekl = ek_data->len;	
+	sscsd* iv_data = SSCS_object_data(obj,"iv");
+	byte* iv = iv_data->data;
+
 	unsigned char* dec_buf = malloc(2000);
 	memset(dec_buf,0,2000);
 	
 	int dec_len = envelope_open(privKey,enc_buf,enc_len,ek,ekl,iv,dec_buf);
 	assert(dec_len > 0);
 
-	//Object that includes signature + binn(message+recipient)
-	binn* obj2 = binn_open(dec_buf);
-	assert(obj2 != NULL);
+	sscso* obj2 = SSCS_open(dec_buf);
+	sscsd* serializedobj3_data = SSCS_object_data(obj2,"sscso");
+	byte* serializedobj3 = serializedobj3_data->data;
+	int serializedobj3l = serializedobj3_data->len;
+	sscso* obj3 = SSCS_open(serializedobj3);
 
-	int serializedobj3l = binn_object_int32(obj2,"binnl");
-	byte* serializedobj3 = binn_object_blob(obj2,"binn",&serializedobj3l);
-	//Object that includes message + recipient
-	binn* obj3 = binn_open(serializedobj3);
-	assert(obj3 != NULL);
-		
-	EVP_PKEY *userpubk = get_pubk_username(binn_object_str(obj,"sender"),db);
+	char* sender = SSCS_object_string(obj,"sender");
+	EVP_PKEY *userpubk = get_pubk_username(sender,db);
+	if(!userpubk){
+		printf("error retrieving public key for %s",sender);	
+		free(sender);	
+		free(dec_buf);
+		SSCS_release(&obj);
+		SSCS_release(&obj2);
+		SSCS_release(&obj3);	
+		SSCS_data_release(&serializedobj3_data);
+		SSCS_data_release(&ek_data);
+		SSCS_data_release(&enc_buf_data);
+		SSCS_data_release(&iv_data);	
+		return NULL;
+	}
+	sscsd* sig_data = SSCS_object_data(obj2,"sig");
+	if(!sig_data){
+		printf("error retrieving public key for %s",sender);	
+		free(sender);	
+		free(dec_buf);
+		SSCS_release(&obj);
+		SSCS_release(&obj2);
+		SSCS_release(&obj3);	
+		SSCS_data_release(&serializedobj3_data);
+		SSCS_data_release(&ek_data);
+		SSCS_data_release(&enc_buf_data);
+		SSCS_data_release(&iv_data);		
+	}
+	byte* sig = sig_data->data;
+	int sigl = sig_data->len;
 
-	int sigl = binn_object_int32(obj2,"sigl");
-	byte* sig = binn_object_blob(obj2,"sig",&sigl);
 	int rc = verifymsg(serializedobj3,serializedobj3l,sig,sigl,userpubk);
 
 	if(rc == 0){
@@ -369,14 +405,20 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 	}	
 	else{
 		puts("failed to verify signature");
+		return NULL;
 	}
 
-	char* f_buf = binn_object_str(obj3,"msg");
-	free(dec_buf);
-	free(deb64encryptedbuffer);
-	binn_free(obj);
-	binn_free(obj2);
-	binn_free(obj3);
+	char* f_buf = SSCS_object_string(obj3,"msg");
+
+	SSCS_release(&obj);
+	SSCS_release(&obj2);
+	SSCS_release(&obj3);	
+	SSCS_data_release(&sig_data);
+	SSCS_data_release(&serializedobj3_data);
+	SSCS_data_release(&ek_data);
+	SSCS_data_release(&enc_buf_data);
+	SSCS_data_release(&iv_data);
+	free(sender);	
 	EVP_PKEY_free(userpubk);
 	
 	
@@ -489,7 +531,11 @@ int verifymsg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PK
 {
     /* Returned to caller */
     int result = -1;
-    
+    if(!msg)assert(0);
+    if(!mlen)assert(0);
+    if(!sig)assert(0);
+    if(!slen)assert(0);
+    if(!pkey)assert(0); 
     if(!msg || !mlen || !sig || !slen || !pkey) {
         assert(0);
         return -1;

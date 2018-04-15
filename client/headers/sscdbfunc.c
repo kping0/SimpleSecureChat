@@ -16,7 +16,6 @@
 
 #include <sqlite3.h> 
 #include "sscdbfunc.h"
-#include "binn.h"
 #include "serialization.h"
 #include "base64.h"
 
@@ -205,41 +204,43 @@ const char* registerUserStr(sqlite3* db){ //returns string you can pass to serve
 		sqlite3_finalize(stmt);
 		return NULL;
 	}
-	binn* obj;
-	obj = binn_object();
-	binn_object_set_int32(obj,"msgp",REGRSA); //message purpose
-	binn_object_set_str(obj,"b64rsa",(char*)b64buf); //set B64 Public Key of local user
-	binn_object_set_int32(obj,"rsalen",rsalen); //length of rsakey(needed for deserializing)
-	binn_object_set_str(obj,"rusername",(char*)getMUSER(db)); //Username to register 
-	binn_object_set_str(obj,"authkey",(char*)authkey); //authkey
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //Encode Everything
-	binn_free(obj);
+	sscso* obj = SSCS_object();
+	int messagep = REGRSA;
+	SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"b64rsa",(char*)b64buf,strlen(b64buf));
+	SSCS_object_add_data(obj,"rsalen",&rsalen,sizeof(int));
+	char* username = getMUSER(db);
+	SSCS_object_add_data(obj,"rusername",username,strlen(username));
+	SSCS_object_add_data(obj,"authkey",authkey,strlen(authkey));
 	sqlite3_finalize(stmt);	
-	return final_b64;
+	const char* retptr = SSCS_object_encoded(obj);
+	SSCS_release(&obj);	
+	free(username);
+	return retptr; 
 }
 
 const char* ServerGetUserRSA(char* username){ //Generates a character array that can be sent the message buffer server to request a userpublickey
-	binn* obj;
-	obj = binn_object();
+	sscso* obj = SSCS_object();
 	char* newline = strchr(username,'\n');
 	if(newline)*newline=0;
-	binn_object_set_int32(obj,"msgp",GETRSA); //message purpose
-	binn_object_set_str(obj,"username",username); //Set to user requested
-	const char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj)); //Encode Everything
-	binn_free(obj);
-	return final_b64;		
+	int messagep = GETRSA;
+	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"username",username,strlen(username));	
+	const char* retptr = SSCS_object_encoded(obj);	
+	SSCS_release(&obj);
+	return retptr;	
 }
 
 const char* ServerGetMessages(sqlite3* db){ //Generates a character array that can be sent to message buffer server to receive back your stored encrypted message
 	char* username = getMUSER(db);
-	binn* obj;
-	obj = binn_object();
-	binn_object_set_int32(obj,"msgp",MSGREC); //message purpose
-	binn_object_set_str(obj,"username",username); //Current username
-	//binn_object_set_str(obj,"authkey",authkey); //will in the future be used(registered with the name), sha256 and stored in server db.
-	const char* msg2srv64 = base64encode(binn_ptr(obj),binn_size(obj));
-	binn_free(obj);
-	return msg2srv64;
+	sscso* obj = SSCS_object();
+	int messagep = MSGREC;
+	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"username",username,strlen(username));
+	const char* retptr = SSCS_object_encoded(obj);
+	SSCS_release(&obj);
+	free(username);
+	return retptr;
 }
 
 char* getMUSER(sqlite3* db){ // Returns the main Username (user with the uid of 1)
@@ -269,14 +270,15 @@ char* AuthUSR(sqlite3* db){
 		sqlite3_finalize(stmt);
 		return NULL;
 	}
-	binn* obj = binn_object();
+	sscso* obj = SSCS_object();
 	char* username = getMUSER(db);
-	binn_object_set_str(obj,"username",username);
-	binn_object_set_int32(obj,"msgp",AUTHUSR);
-	binn_object_set_str(obj,"authkey",authkey);
-	char* final_b64 = base64encode(binn_ptr(obj),binn_size(obj));
-	binn_free(obj);
+	SSCS_object_add_data(obj,"username",username,strlen(username));
+	int messagep = AUTHUSR;
+	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"authkey",authkey,strlen(authkey));
 	sqlite3_finalize(stmt);
-	return final_b64;
+	char* retptr = SSCS_object_encoded(obj);
+	SSCS_release(&obj);
+	free(username);
+	return retptr;
 }
-

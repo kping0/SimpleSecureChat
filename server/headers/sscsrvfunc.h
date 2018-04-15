@@ -21,8 +21,9 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h> 
 
-#include "binn.h"
+#include "serialization.h"
 #include "settings.h"
+#include "base64.h"
 
 #define UNUSED(x)((void)x)
 extern int sock;

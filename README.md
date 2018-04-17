@@ -7,7 +7,7 @@
 Dependencies:
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 2. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
-
+3. Gtk+ 3.2 (Only if compiled with GUI)
 <h2> Client </h2>
 
 To compile the client install "make" and run:

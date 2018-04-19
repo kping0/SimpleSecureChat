@@ -13,6 +13,7 @@ Dependencies:
 To compile the client install "make" and run:
 
     make #(Run inside of the client directory)
+    make gui
     
 To remove generated files(for example to reset the db):
 

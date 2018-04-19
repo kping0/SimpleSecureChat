@@ -1,1 +1,0 @@
-Beta Gui using gtk+.

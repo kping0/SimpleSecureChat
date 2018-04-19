@@ -5,6 +5,10 @@
 * This file contains all the configurable settings for SimpleSecureChat
 */
 
+//You can only have a GUI or a CLI, not both.. if both are defined SSC will not work
+#define SSC_GUI /* To have a Gtk+ GUI */
+//#define SSC_CLI /* Uncomment for CLI version */
+
 #define HOST_NAME "127.0.0.1" //SSC Server IP
 #define HOST_PORT "5050" //SSC Server Port
 #define HOST_CERT "public.pem" //SSC Server public certificate (X509 Public Cert)

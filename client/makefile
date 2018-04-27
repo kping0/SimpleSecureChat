@@ -28,4 +28,5 @@ cli: all
 	gcc -DSSC_CLI -o testbinary-cli main.o sscdbfunc.o msgfunc.o sscasymmetric.o sscssl.o base64.o serialization.o -O0 -Wall -Wextra -lssl -lcrypto -lsqlite3 
 	rm -f *.o
 
-
+gitprep: clean 
+	rm -f public.pem README.md ../README.md

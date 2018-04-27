@@ -2,7 +2,7 @@
 void init_gui(struct sscswidgets_gui* data){
 	sqlite3_stmt* stmt;
 	sqlite3* db = (data->backend_vars)->db;
-	sqlite3_prepare_v2(db,"select username from knownusers where NOT uid=0 AND NOT uid=1",-1,&stmt,NULL); //uid(0) is testuser and uid(1) is your own user..
+	sqlite3_prepare_v2(db,"select username from knownusers where NOT uid=0",-1,&stmt,NULL); //uid(0) is testuser 
 	
 	assert(stmt);
 	while(sqlite3_step(stmt) == SQLITE_ROW){
@@ -11,7 +11,7 @@ void init_gui(struct sscswidgets_gui* data){
 	sqlite3_finalize(stmt);
 	return;
 }
-void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages GtkListBox
+void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages GtkListBox and received_messages
 	GtkContainer* container = (GtkContainer*)data->messagelist;	
 	GList *children, *iter;
 	children = gtk_container_get_children(GTK_CONTAINER(container));
@@ -26,17 +26,6 @@ void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages Gtk
 	}
 	g_list_free(children2);
 	
-	return;
-}
-
-void clear_recvlist_gui(struct sscswidgets_gui* data){ //clear received messages GtkListBox
-	GtkContainer* container = (GtkContainer*)data->recvlist;	
-	GList *children, *iter;
-	children = gtk_container_get_children(GTK_CONTAINER(container));
-	for(iter = children; iter != NULL; iter = g_list_next(iter)){
-		gtk_widget_destroy(GTK_WIDGET(iter->data));
-	}
-	g_list_free(children);
 	return;
 }
 
@@ -55,6 +44,9 @@ void change_current_user_gui(GtkWidget* widget,gpointer data){
 	*((pobj->widgets)->current_username) = pobj->item; //Change the pointer in main() to the current_username
 	gtk_label_set_text((pobj->widgets)->chatpartnerlabel,pobj->item);
 	gtk_widget_show((GtkWidget*)(pobj->widgets)->chatpartnerlabel);
+
+	//get messages from server & and add stored ones to GUI
+	//getmessages_gui(NULL,pobj);
 	return;
 }
 
@@ -77,11 +69,28 @@ void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,cha
 
 void send_message_entry_gui(GtkEntry* entry,gpointer data){
 	struct sscswidgets_gui* widgets = data;
+	sqlite3* db = (widgets->backend_vars)->db;
+	BIO* srvconn = ((widgets->backend_vars)->connection_variables)->bio_obj;		
+	EVP_PKEY* priv_evp = (widgets->backend_vars)->privkey;
+	char* username = *(widgets->current_username);
 	GtkWidget* messagelist = widgets->messagelist;	
 	const char* message = gtk_entry_get_text(GTK_ENTRY(entry));
 	append_list_string_gui(messagelist,message);
-	gtk_entry_set_text(entry,"");
+	append_list_string_gui(widgets->recvlist," ");
 	printf("Sending Message to %s\n",*(widgets->current_username));
+	char* encbuf = (char*)encryptmsg(username,(unsigned char*)message,priv_evp,db); //"user" would be the receiving username
+	if(!encbuf)return;
+	printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+	sqlite3_stmt* stmt;
+	sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,1,?1,?2);",-1,&stmt,NULL);
+//	sqlite3_bind_text(stmt,1,username,-1,0);
+	sqlite3_bind_int(stmt,1,getUserUID(username,db));
+	sqlite3_bind_text(stmt,2,message,-1,0);
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+	BIO_write(srvconn,encbuf,strlen(encbuf));
+	free(encbuf);
+	gtk_entry_set_text(entry,"");
 	return;
 }
 
@@ -126,11 +135,15 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,char* username){
 void getmessages_gui(GtkWidget* notused,gpointer data){ //get message & add them to db
 	(void)notused; //not used.
 	sqlite3* db = (((sscvars_gui*)data)->backend_vars)->db;
+	sqlite3_stmt* stmt;
 	BIO* srvconn = ((((sscvars_gui*)data)->backend_vars)->connection_variables)->bio_obj;		
 	EVP_PKEY* priv_evp = (((sscvars_gui*)data)->backend_vars)->privkey;
 	GtkWidget* recvlist = ((sscvars_gui*)data)->recvlist;
-	int i=0;	
+	char* current_user = *(((sscvars_gui*)data)->current_username);
+	if(!current_user)return;
+	int i = 0;	
 	char* getmsgbuf = (char*)ServerGetMessages(db);		
+	if(!getmsgbuf)return;
 	char* decbuf = NULL;
 	char* recvbuf = malloc(200000);
 	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	
@@ -138,7 +151,7 @@ void getmessages_gui(GtkWidget* notused,gpointer data){ //get message & add them
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999);	
 	
-	if(strcmp(recvbuf,"ERROR") == 0){ free(recvbuf);return;}
+	if(strcmp(recvbuf,"ERROR") != NULL){
 	sscsl* list = SSCS_list_open(recvbuf);
 	while(1){
 		i++;	
@@ -148,15 +161,39 @@ void getmessages_gui(GtkWidget* notused,gpointer data){ //get message & add them
 		SSCS_data_release(&prebuf);
 		char* sender = SSCS_object_string(obj2,"sender");
 		if(!sender)break;
-		//if(sender == NULL)pexit("did not find label sender");
-		decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	
+		decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
 		if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
-		append_list_string_gui(recvlist,decbuf);
+		sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
+		sqlite3_bind_int(stmt,1,getUserUID(sender,db));
+		sqlite3_bind_text(stmt,2,decbuf,-1,0);
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+		stmt = NULL;
 		SSCS_release(&obj2);
 		free(sender);
 		if(decbuf)free(decbuf);
 	}
 	SSCS_list_release(&list);
+	}
 	free(recvbuf);
+	int currentuserUID = getUserUID(current_user,db);
+	printf("UID for user %s is %i\n",current_user,currentuserUID);
+	if(currentuserUID == -1)return;
+	sqlite3_prepare_v2(db,"select message from messages where uid=?1 AND uid2=1",-1,&stmt,NULL);
+	sqlite3_bind_int(stmt,1,currentuserUID);	
+	while(sqlite3_step(stmt) == SQLITE_ROW){
+		append_list_string_gui(recvlist,sqlite3_column_text(stmt,0));
+		append_list_string_gui(((sscvars_gui*)data)->messagelist," ");
+	}
+	sqlite3_finalize(stmt);
+	stmt = NULL;	
+	sqlite3_prepare_v2(db,"select message from messages where uid=1 AND uid2=?1",-1,&stmt,NULL);
+	sqlite3_bind_int(stmt,1,currentuserUID);
+	while(sqlite3_step(stmt) == SQLITE_ROW){
+		append_list_string_gui(((sscvars_gui*)data)->messagelist,sqlite3_column_text(stmt,0));
+		append_list_string_gui(recvlist," ");
+	
+	}
+	sqlite3_finalize(stmt);
 	return;
 }

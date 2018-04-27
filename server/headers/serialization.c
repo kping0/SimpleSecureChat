@@ -65,7 +65,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	size_t old_buf_size = list->allocated;	
 	size_t old_buf_items = list->items;
 	size_t encoded_size;
-	byte* b64data = base64_encode(data,size,&encoded_size);
+	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
 	char label[12];
 	sprintf(label,"%zd:\"",old_buf_items+1);
@@ -123,7 +123,7 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 		}
 	}
 
-	byte* b64data = base64_encode(data,size,&encoded_size);
+	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
 	size_t final_intermediate_len = b64datalen+modlabel_len+2; //+2 for the ' "; ' at the end
 	byte* intermediatebuf = calloc(1,final_intermediate_len);
@@ -201,7 +201,7 @@ sscsd* SSCS_object_data(sscso* obj,char* label){
 	}
 	size_t len; 
 	sscsd* final = calloc(1,sizeof(sscsd));
-	final->data = base64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
+	final->data = mitbase64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
 	free(b64buffer);
 	return final;
@@ -244,7 +244,7 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	}
 	size_t len; 
 	sscsd* final = calloc(1,sizeof(sscsd));
-	final->data = base64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
+	final->data = mitbase64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
 	free(b64buffer);
 	free(label);

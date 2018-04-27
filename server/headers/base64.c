@@ -22,7 +22,7 @@ static const unsigned char base64_table[65] =
  * nul terminated to make it easier to use as a C string. The nul terminator is
  * not included in out_len.
  */
-unsigned char * base64_encode(const unsigned char *src, size_t len,
+unsigned char * mitbase64_encode(const unsigned char *src, size_t len,
 			      size_t *out_len)
 {
 	unsigned char *out, *pos;
@@ -80,7 +80,7 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
  *
  * Caller is responsible for freeing the returned buffer.
  */
-unsigned char * base64_decode(const unsigned char *src, size_t len,
+unsigned char * mitbase64_decode(const unsigned char *src, size_t len,
 			      size_t *out_len)
 {
 	unsigned char dtable[256], *out, *pos, block[4], tmp;
@@ -144,11 +144,11 @@ unsigned char * base64_decode(const unsigned char *src, size_t len,
 */
 unsigned char* base64encode(char *src,size_t len){
 	size_t enclen;
-	unsigned char* encoded = base64_encode((const unsigned char*)src,len,&enclen);
+	unsigned char* encoded = mitbase64_encode((const unsigned char*)src,len,&enclen);
 	return encoded;
 }
 unsigned char* base64decode(char *src,size_t len){
 	size_t declen;
-	unsigned char* decoded = base64_decode((const unsigned char*)src,len,&declen);
+	unsigned char* decoded = mitbase64_decode((const unsigned char*)src,len,&declen);
 	return decoded;
 }

@@ -11,10 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-unsigned char * base64_encode(const unsigned char *src, size_t len,
+/*
+* Names changed from base64_encode & base64_decode to mitbase64_encode & mitbase64_decode because conflict with mysql client library function
+*/
+unsigned char * mitbase64_encode(const unsigned char *src, size_t len,
 			      size_t *out_len);
-unsigned char * base64_decode(const unsigned char *src, size_t len,
+unsigned char * mitbase64_decode(const unsigned char *src, size_t len,
 			      size_t *out_len);
 
 unsigned char* base64encode(char *src,size_t len);

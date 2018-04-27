@@ -1,6 +1,9 @@
 #include <string.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -8,16 +11,14 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/bio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <errno.h>
 #include <openssl/crypto.h> 
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h> 
-#include <sqlite3.h>
+#include <my_global.h>
+#include <mysql.h>
 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 #include "headers/settings.h" //settings for ssc
@@ -30,15 +31,15 @@ int main(void){
     puts("SSC_VERIFY_VARIABLES IS DEFINED.");
     #endif
     //register signal handlers..
-    signal(SIGINT,sig_handler);
-    signal(SIGABRT,sig_handler);
-    signal(SIGFPE,sig_handler);
-    signal(SIGILL,sig_handler);
-    signal(SIGSEGV,sig_handler);
-    signal(SIGTERM,sig_handler);
+    signal(SIGINT,ssc_sig_handler);
+    signal(SIGABRT,ssc_sig_handler);
+    signal(SIGFPE,ssc_sig_handler);
+    signal(SIGILL,ssc_sig_handler);
+    signal(SIGSEGV,ssc_sig_handler);
+    signal(SIGTERM,ssc_sig_handler);
     signal(SIGCHLD,childexit_handler);
     //initialize the sqlite3 database
-    sqlite3* db = initDB(SRVDB); 
+    init_DB();
 	
     SSL_CTX *ctx;
 
@@ -57,7 +58,7 @@ int main(void){
 	
 	// Accept Client Connections.
         int client = accept(sock, (struct sockaddr*)&addr, &len);
-	printf("Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
+	fprintf(stdout,"Info: Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
 	* by the function childexit_handler
@@ -86,6 +87,7 @@ int main(void){
 	assert(ssl != NULL);
 	#endif
 	char* buf = malloc(4096); //Main receive buffer for receiving from SSL socket
+	MYSQL* db = get_handle_DB();
 	while(1){ //Handle request until interrupt or connection problems	
 		memset(buf,'\0',4096);
         	int r = SSL_read(ssl,buf, 4095); 
@@ -98,53 +100,63 @@ int main(void){
             		default: 
                 		goto end;
             	}
-//		printf("Buffer is %s\n",buf);
 		sscso* obj0 = SSCS_open(buf);
 		int msgp0  = SSCS_object_int(obj0,"msgp");
-//		printf("message arrived with message purpose %i\n",msgp0);
-
+#ifdef DEBUG
+		fprintf(stdout,"Update: Message arrived with message purpose %i\n",msgp0);
+#endif
 		if(msgp0 == REGRSA){ //User wants to register a username with a public key
 			char* rusername = SSCS_object_string(obj0,"rusername");
+			if(!rusername){
+				fprintf(stderr,"Error: User wants to register but username not found in serialized object\n");
+				goto end;
+			}
 			char* newline = strchr(rusername,'\n');
 			if( newline ) *newline = 0;
 	
 			if(checkforUser(rusername,db) == 1){
-				puts("Cannot add user: username already taken.");
+				fprintf(stderr,"Error: Cannot add user \"%s\"-> username already taken.\n",rusername);
 			}
 			else{
-				puts("inserting user into db");
+#ifdef DEBUG
+				fprintf(stdout,"Update: User \"%s\" is trying to register\n",rusername);
+#endif
 				char* b64rsa = SSCS_object_string(obj0,"b64rsa");
 				int rsalen = SSCS_object_int(obj0,"rsalen");
 				char* authkey = SSCS_object_string(obj0,"authkey");
-				//if(strlen(authkey) != 256) goto end;
+				if(strlen(authkey) < 256) goto end;
 				if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
-					puts("error inserting user");
+					fprintf(stderr,"Error: inserting user %s\n",rusername);
+					goto end;
 				}
 				else{
-					puts("added user");
+#ifdef DEBUG
+					fprintf(stdout,"Update: User \"%s\" registered\n",rusername);	
+#endif
+					free(rusername);
 				}
 			}
 		}
 		else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
-			puts("User wants to authenticate, handling...");
+#ifdef DEBUG
+			fprintf(stdout,"Update: User sent request to authenticate,handling...\n");
+#endif
 			char* userauthk = SSCS_object_string(obj0,"authkey");
 			if(strlen(userauthk) < 256){
-				printf("Supplied Authkey smaller 256, it is %i",strlen(userauthk));
+				fprintf(stderr,"Error: Authkey supplied <256 (%i)\n",strlen(userauthk));
 				goto end;
 			}
 			char* authusername = SSCS_object_string(obj0,"username");
 			char* userauthk_db = getUserAuthKey(authusername,db);
-			//printf("User %s with supplied authkey %s with len %iis trying to auth, comparing with %s\n",authusername,userauthk,strlen(userauthk),userauthk_db);
-			//Problem: getUserAuthKey returns NULL
-			if(userauthk_db == NULL){
-				puts("userauthk_db == NULL, exiting");
+			if(!userauthk_db){
+				fprintf(stderr,"Error: Authkey returned by getUserAuthKey is NULL, exiting\n");
 				goto end;
 			}
 			int memcmpres = memcmp(userauthk_db,userauthk,256);
-
-//			printf("Memory compare resulted in %i\n",memcmpres);
-			if(memcmpres == 0){ //Compare stored authkey to usersupplied authkey
-				printf("User %s authenticated.\n",authusername);
+			if(memcmpres == 0){ //Compare stored authk to sent authk
+#ifdef DEBUG
+				fprintf(stdout,"Update: User \"%s\" authenticated.\n",authusername);
+#endif /* DEBUG */
 				SSCS_release(&obj0);
 				free(userauthk_db);
 				userauthk_db = NULL; //for sanities sake set to NULL
@@ -166,39 +178,48 @@ int main(void){
 					* Important Functions are only accessible when user has authenticated.
 					*/
 					if(msgp == GETRSA){ //Client is requesting a User Public Key
-						puts("Client Requested Public Key,handling...");
+#ifdef DEBUG
+						fprintf(stdout,"Update: Client Requested Public Key,handling...\n");
+#endif /* DEBUG */
 						char* rsausername = SSCS_object_string(obj,"username");
 						const char* uRSAenc = GetEncodedRSA(rsausername,db);
-					//	printf("Sending buffer %s\n",uRSAenc);
+#ifdef DEBUG
+						fprintf(stdout,"Update: Sending buffer \"%s\"\n",uRSAenc);
+#endif /* DEBUG */
 						if(uRSAenc != NULL) SSL_write(ssl,uRSAenc,strlen(uRSAenc));
 						free(rsausername);
 					}
 					else if(msgp == MSGREC){ //Client is requesting stored messages
-						puts("Client Requesting New Messages,handling...");
+#ifdef DEBUG
+						fprintf(stdout,"Update: Client Requesting New Messages, handling...\n");
+#endif
 						char* retmsg = GetUserMessagesSRV(authusername,db);
-						printf("Length of message is %d\n",(int)strlen(retmsg));
-						if(retmsg) SSL_write(ssl,retmsg,strlen(retmsg));
-						if(!retmsg)SSL_write(ssl,"ERROR",5);
+#ifdef DEBUG
+						fprintf(stdout,"Update: Length of messages returned is %d\n",strlen(retmsg));
+#endif
+						if(strlen(retmsg) != 0){ SSL_write(ssl,retmsg,strlen(retmsg));}
+						else{SSL_write(ssl,"ERROR",5);}
 						//call function that returns an int,(messages available)send it to the client,and then send i messages to client in while() loop. 
 					}
 					else if(msgp == MSGSND){ //User wants to send a message to a user
 						char* recipient = NULL;
 						recipient = SSCS_object_string(obj,"recipient");
-						if(!recipient)goto end;
+						if(!recipient){
+						fprintf(stderr,"Error: Recipient for message not specified,exiting\n");
+						goto end;
+						}
 						if(SSCS_object_string(obj,"sender") != NULL)goto end;
 						SSCS_object_add_data(obj,"sender",authusername,strlen(authusername));
 						char* newline = strchr(recipient,'\n');
 						if( newline ) *newline = 0;
 						char* b64modbuf = obj->buf_ptr;
-						#ifdef SSC_VERIFY_VARIABLES
-						if(recipient == NULL)goto end;
-						#endif
-						printf("Buffering message from %s to %s\n",authusername,recipient);
+#ifdef DEBUG
+						fprintf(stdout,"Update: buffering message from %s to %s\n",authusername,recipient);
+#endif
 						if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
-							puts("Error Adding MSG to DB");
+							fprintf(stderr,"Error: Error occurred adding MSG to Database\n");
 						}				
 					}
-
 					SSCS_release(&obj);
 				}
 			}
@@ -210,12 +231,16 @@ int main(void){
 		}
 		else{
 			puts("Message received with no specific purpose");
+			fprintf(stderr,"Error: ? Message received with no specific purpose, exiting...\n");
+			SSCS_release(&obj0);
+			goto end;
 		}
-
 		SSCS_release(&obj0);
 	}
 end: //cleanup & exit
-	puts("Ending Client Session");
+#ifdef DEBUG
+	fprintf(stdout,"Update: Ending Client Session\n");
+#endif
 	BIO_free(bio);
         SSL_free(ssl);
         close(client); 
@@ -228,7 +253,10 @@ end: //cleanup & exit
 
 
     } 
-    //If while loop is broken close listening socket and do cleanup
+    //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
+#ifdef DEBUG
+    fprintf(stdout,"Update: Server Main Process is shutting down..\n");
+#endif
     close(sock);
     SSL_CTX_free(ctx);
     cleanup_openssl();

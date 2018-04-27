@@ -2,7 +2,7 @@
 
 Dependencies:
   1. OpenSSL(with development files)
-  2. SQLite(with developement files)
+  2. MYSQL/MariaDB(with development files)
   
   To compile install "make" and run:
   
@@ -11,4 +11,4 @@ Dependencies:
   
      openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 
 
-  Note that this certificate (in this case "cert.pem") ALSO needs to be put in the client directory with the name "public.pem"(default configuration) for server validation to prevent MITM attacks. The client will not connect if the server certificate does not match with client/public.pem
+  Note that the Client validates the server provided certificate against the file "client/public.pem", so if you are setting up your own server you need to copy the generated server public key(cert.pem) to your client(copy to client/public.pem).  

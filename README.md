@@ -4,7 +4,9 @@
  
  STILL IN DEVELOPMENT
 
-Client Dependencies:
+<h2>Client</h2> 
+Dependencies:
+
 1. OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev) 
 2. SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
 3. Gtk+ 3.2 (Only if compiled with GUI)
@@ -17,5 +19,5 @@ To remove generated files(for example to reset the db):
 
     make clean
    
-   
+<h2>Server</h2>
 For Server instructions go to server/README.md

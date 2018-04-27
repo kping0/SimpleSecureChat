@@ -233,6 +233,7 @@ const char* ServerGetUserRSA(char* username){ //Generates a character array that
 
 const char* ServerGetMessages(sqlite3* db){ //Generates a character array that can be sent to message buffer server to receive back your stored encrypted message
 	char* username = getMUSER(db);
+	if(!username)return NULL;
 	sscso* obj = SSCS_object();
 	int messagep = MSGREC;
 	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));

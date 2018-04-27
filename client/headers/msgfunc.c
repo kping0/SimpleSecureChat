@@ -82,12 +82,15 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 	sscso* obj = SSCS_open(encrypted_buffer);
 
 	sscsd* enc_buf_data = SSCS_object_data(obj,"enc_buf");
+	if(!enc_buf_data)return NULL;
 	byte* enc_buf = enc_buf_data->data;
 	int enc_len = enc_buf_data->len;
 	sscsd* ek_data = SSCS_object_data(obj,"ek");
+	if(!ek_data)return NULL;
 	byte* ek = ek_data->data;
 	int ekl = ek_data->len;	
 	sscsd* iv_data = SSCS_object_data(obj,"iv");
+	if(!iv_data)return NULL;
 	byte* iv = iv_data->data;
 
 	unsigned char* dec_buf = malloc(2000);

@@ -20,6 +20,9 @@
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h> 
+#include <assert.h>
+#include <my_global.h>
+#include <mysql.h>
 
 #include "serialization.h"
 #include "settings.h"
@@ -38,24 +41,32 @@ SSL_CTX *create_context(void);
 
 void configure_context(SSL_CTX* ctx);
 
-int checkforUser(char* username,sqlite3* db); 
+int checkforUser(char* username,MYSQL* db); 
 
-int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,sqlite3* db);
+int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db);
 	
-void sig_handler(int sig);
+void ssc_sig_handler(int sig);
 
 void childexit_handler(int sig);
 
-int getUserUID(char* username,sqlite3 *db);
+int getUserUID(char* username,MYSQL *db);
 
-int AddMSG2DB(sqlite3* db,char* recipient,unsigned char* message);
+int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message);
 
-sqlite3* initDB(char* dbfname);
+//sqlite3* initDB(char* dbfname); /* DEPRECATED */
 
-const char* GetEncodedRSA(char* username, sqlite3* db);
+void exit_mysql_err(MYSQL* con); //print error message and exit
 
-char* GetUserMessagesSRV(char* username,sqlite3* db);
+int my_mysql_query(MYSQL* con,char* query); //mysql_query() with error checking
 
-char* getUserAuthKey(char* username, sqlite3* db); //gets authkey of user 'username', used for authentication
+void init_DB(void); //initalize MySQL database
+
+MYSQL* get_handle_DB(void); //get handle to database
+
+const char* GetEncodedRSA(char* username, MYSQL* db);
+
+char* GetUserMessagesSRV(char* username,MYSQL* db);
+
+char* getUserAuthKey(char* username, MYSQL* db); //gets authkey of user 'username', used for authentication
 
 #endif

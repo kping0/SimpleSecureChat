@@ -63,6 +63,9 @@ int main(void){
 	}
 	else{
 		puts("SSL/TLS ERROR");	
+		puts("Exiting, cannot establish connection with server");
+		free(tls_vars);
+		exit(1);
 	}
 	//Load Keypair From Disk
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
@@ -215,9 +218,7 @@ int main(void){
 				fgets(inbuf2,1024,stdin);
 				//sending user
 				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,priv_evp,db); //"user" would be the receiving username
-				if(encbuf == NULL){
-					break;
-				}
+				if(!encbuf)break;
 				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
 				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
 				free(encbuf);

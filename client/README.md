@@ -1,12 +1,19 @@
+<h2>Client</h2>
+Dependencies:
 
+    OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev)
+    SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
+    Gtk+ 3.2 (Only if compiled with GUI)
 
-Not Yet Completed. 
+To compile the client install "make" and run:
 
-To compile the client, run the included 
+    make gui #(Run inside of the client directory)
 
-    makescript.sh
+To reset your instance of SimpleSecureChat-Client:
+
+    make clean
     
-To customize the client, change the definitions on the top of the secure_chat.c file. Example:
+To customize the client, change the headers/settings.h file. Example:
 
     #define HOST_NAME "xxx.xxx.xxx.xxx" //Server IP
     ...

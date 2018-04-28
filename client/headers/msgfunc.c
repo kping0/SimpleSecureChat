@@ -1,3 +1,22 @@
+
+/*
+ *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
+ *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "msgfunc.h"
 
 const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
@@ -163,7 +182,9 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 	return (const char*)f_buf;
 
 }
-
+/*
+ * This Everything below this point is taken from the OpenSSL wiki -> the LICENSE for these functions is * https://www.openssl.org/source/license.html
+ */
 int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey)
 {
     /* Returned to caller */

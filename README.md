@@ -11,8 +11,9 @@
 
 <h2>License Header</h2>
 
-  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
-  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
+  SimpleSecureChat Client/Server - E2E encrypted messaging application written in C
+  
+  Copyright (C) 2017-2018 The SimpleSecureChat Authors. (kping0)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by

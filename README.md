@@ -10,6 +10,7 @@
   For Server instructions go to server/README.md
 
 <h2>License Header</h2>
+
   <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
   Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
 

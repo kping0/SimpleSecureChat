@@ -344,7 +344,7 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
         bind[0].buffer_length=sizeof(int);
         bind[1].buffer_type=MYSQL_TYPE_STRING;
         bind[1].buffer=message;
-        bind[1].buffer_length=strlen(message);
+        bind[1].buffer_length=(size_t)strlen((const char*)message);
         if(mysql_stmt_bind_param(stmt,bind)){
                 fprintf(stderr,"Error: mysql_stmt_bind_param err (%s)->AddMSG2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
@@ -394,9 +394,9 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
                 exit(1);
         }
 
-        char* rsapub64 = NULL;
-        int rsalen = -1;
-        int rsapub64_len = 0;
+        byte* rsapub64 = NULL;
+        size_t rsalen = -1;
+        size_t rsapub64_len = 0;
         MYSQL_BIND result[2];
         memset(result,0,sizeof(result));
         result[0].buffer_type=MYSQL_TYPE_STRING;
@@ -445,13 +445,13 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
                 return NULL;
         }
 #ifdef DEBUG
-        fprintf(stdout,"Length returned by GetEncodedRSA is %i->>%s)\n",rsalen,rsapub64);
+        fprintf(stdout,"Length returned by GetEncodedRSA is %i->>%s)\n",(int)rsalen,rsapub64);
 #endif /* DEBUG */
         int messagep = GETRSA_RSP;
         sscso* obj = SSCS_object();
-        SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
+        SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
         SSCS_object_add_data(obj,"b64rsa",rsapub64,rsapub64_len);
-        SSCS_object_add_data(obj,"rsalen",&rsalen,sizeof(int));
+        SSCS_object_add_data(obj,"rsalen",(byte*)&rsalen,sizeof(int));
         const char* retptr = SSCS_object_encoded(obj);
 //cleanup
         SSCS_release(&obj);
@@ -493,7 +493,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
                 exit(1);
         }
         MYSQL_BIND result[1];
-        int msglength = 0;
+        size_t msglength = 0;
         memset(result,0,sizeof(result));
         result[0].buffer_type=MYSQL_TYPE_STRING;
         result[0].length=&msglength;
@@ -536,7 +536,7 @@ while(1){
                 mysql_stmt_close(stmt);
                 break;
         }
-        SSCS_list_add_data(list,msgbuf,msglength);
+        SSCS_list_add_data(list,(byte*)msgbuf,msglength);
         free(msgbuf);
         msgbuf = NULL;
 }
@@ -615,7 +615,7 @@ char* getUserAuthKey(char* username, MYSQL* db){
         }
 
         char* authkey = NULL;
-        int authkey_len = 0;
+        size_t authkey_len = 0;
         MYSQL_BIND result[1];
         memset(result,0,sizeof(result));
         result[0].buffer_type=MYSQL_TYPE_STRING;
@@ -650,7 +650,7 @@ char* getUserAuthKey(char* username, MYSQL* db){
         if(authkey_len >= 256){
                 authkey = malloc(authkey_len); //allocate buffer for string
                 memset(result,0,sizeof(result)); //reset result 
-                result[0].buffer=MYSQL_TYPE_STRING;
+                result[0].buffer_type=MYSQL_TYPE_STRING;
                 result[0].buffer=authkey;
                 result[0].buffer_length=authkey_len;
                 mysql_stmt_fetch_column(stmt,result,0,0); //get string

@@ -114,13 +114,13 @@ int main(void){
 		    		default: 
 		        		goto end;
 		    	}
-			sscso* obj0 = SSCS_open(buf);
+			sscso* obj0 = SSCS_open((byte*)buf);
 			int msgp0  = SSCS_object_int(obj0,"msgp");
 	#ifdef DEBUG
 			fprintf(stdout,"Update: Message arrived with message purpose %i\n",msgp0);
 	#endif
 			if(msgp0 == REGRSA){ //User wants to register a username with a public key
-				char* rusername = SSCS_object_string(obj0,"rusername");
+				char* rusername = (char*)SSCS_object_string(obj0,"rusername");
 				if(!rusername){
 					fprintf(stderr,"Error: User wants to register but username not found in serialized object\n");
 					goto end;
@@ -136,9 +136,9 @@ int main(void){
 	#ifdef DEBUG
 					fprintf(stdout,"Update: User \"%s\" is trying to register\n",rusername);
 	#endif
-					char* b64rsa = SSCS_object_string(obj0,"b64rsa");
+					char* b64rsa = (char*)SSCS_object_string(obj0,"b64rsa");
 					int rsalen = SSCS_object_int(obj0,"rsalen");
-					char* authkey = SSCS_object_string(obj0,"authkey");
+					char* authkey = (char*)SSCS_object_string(obj0,"authkey");
 					if(strlen(authkey) < 256) goto end;
 					if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
 						fprintf(stderr,"Error: inserting user %s\n",rusername);
@@ -158,12 +158,12 @@ int main(void){
 	#ifdef DEBUG
 				fprintf(stdout,"Update: User sent request to authenticate,handling...\n");
 	#endif
-				char* userauthk = SSCS_object_string(obj0,"authkey");
+				char* userauthk = (char*)SSCS_object_string(obj0,"authkey");
 				if(strlen(userauthk) < 256){
-					fprintf(stderr,"Error: Authkey supplied <256 (%i)\n",strlen(userauthk));
+					fprintf(stderr,"Error: Authkey supplied <256 (%i)\n",(int)strlen(userauthk));
 					goto end;
 				}
-				char* authusername = SSCS_object_string(obj0,"username");
+				char* authusername = (char*)SSCS_object_string(obj0,"username");
 				char* userauthk_db = getUserAuthKey(authusername,db);
 				if(!userauthk_db){
 					fprintf(stderr,"Error: Authkey returned by getUserAuthKey is NULL, exiting\n");
@@ -192,7 +192,7 @@ int main(void){
 							goto end;
 					    	}
 						buf[4095] = '\0';
-						sscso* obj = SSCS_open(buf);
+						sscso* obj = SSCS_open((byte*)buf);
 						int msgp = SSCS_object_int(obj,"msgp");
 						/*
 						* Important Functions are only accessible when user has authenticated.
@@ -201,14 +201,14 @@ int main(void){
 	#ifdef DEBUG
 							fprintf(stdout,"Update: Client Requested Public Key,handling...\n");
 	#endif /* DEBUG */
-							char* rsausername = SSCS_object_string(obj,"username");
+							char* rsausername = (char*)SSCS_object_string(obj,"username");
 							const char* uRSAenc = GetEncodedRSA(rsausername,db);
 	#ifdef DEBUG
 							fprintf(stdout,"Update: Sending buffer \"%s\"\n",uRSAenc);
 	#endif /* DEBUG */
 							if(uRSAenc){
 								SSL_write(ssl,uRSAenc,strlen(uRSAenc));	
-								free(uRSAenc);
+								free((void*)uRSAenc);
 							}
 							free(rsausername);
 						}
@@ -218,7 +218,7 @@ int main(void){
 	#endif /* DEBUG */
 							char* retmsg = GetUserMessagesSRV(authusername,db);
 	#ifdef DEBUG
-							fprintf(stdout,"Update: Length of messages returned is %d\n",strlen(retmsg));
+							fprintf(stdout,"Update: Length of messages returned is %d\n",(int)strlen(retmsg));
 	#endif /* DEBUG */
 							if(strlen(retmsg) != 0){ 
 								SSL_write(ssl,retmsg,strlen(retmsg));
@@ -230,13 +230,13 @@ int main(void){
 						}
 						else if(msgp == MSGSND){ //User wants to send a message to a user
 							char* recipient = NULL;
-							recipient = SSCS_object_string(obj,"recipient");
+							recipient = (char*)SSCS_object_string(obj,"recipient");
 							if(!recipient){
 							fprintf(stderr,"Error: Recipient for message not specified,exiting\n");
 							goto end;
 							}
 							if(SSCS_object_string(obj,"sender") != NULL)goto end;
-							SSCS_object_add_data(obj,"sender",authusername,strlen(authusername));
+							SSCS_object_add_data(obj,"sender",(byte*)authusername,strlen(authusername));
 							char* newline = strchr(recipient,'\n');
 							if( newline ) *newline = 0;
 							char* b64modbuf = obj->buf_ptr;

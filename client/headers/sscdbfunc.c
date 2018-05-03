@@ -1,4 +1,5 @@
 
+
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -192,7 +193,7 @@ EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based
 	if(sqlite3_step(stmt) == SQLITE_ROW){
 		int rsalen = sqlite3_column_int(stmt,1);
 		b64buf = (unsigned char*)sqlite3_column_text(stmt,0);
-		buf = (unsigned char*)base64decode(b64buf,strlen((const char*)b64buf));
+		buf = (unsigned char*)base64decode((char*)b64buf,strlen((const char*)b64buf));
 		p = buf;
 		if(!d2i_RSAPublicKey(&x,(const unsigned char**)&p, rsalen)) return NULL;
 		EVP_PKEY_assign_RSA(pubkey,x);
@@ -226,11 +227,11 @@ const char* registerUserStr(sqlite3* db){ //returns string you can pass to serve
 	sscso* obj = SSCS_object();
 	int messagep = REGRSA;
 	SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
-	SSCS_object_add_data(obj,"b64rsa",(char*)b64buf,strlen(b64buf));
-	SSCS_object_add_data(obj,"rsalen",&rsalen,sizeof(int));
+	SSCS_object_add_data(obj,"b64rsa",(byte*)b64buf,strlen((const char*)b64buf));
+	SSCS_object_add_data(obj,"rsalen",(byte*)&rsalen,sizeof(int));
 	char* username = getMUSER(db);
-	SSCS_object_add_data(obj,"rusername",username,strlen(username));
-	SSCS_object_add_data(obj,"authkey",authkey,strlen(authkey));
+	SSCS_object_add_data(obj,"rusername",(byte*)username,strlen(username));
+	SSCS_object_add_data(obj,"authkey",(byte*)authkey,strlen((const char*)authkey));
 	sqlite3_finalize(stmt);	
 	const char* retptr = SSCS_object_encoded(obj);
 	SSCS_release(&obj);	
@@ -243,8 +244,8 @@ const char* ServerGetUserRSA(char* username){ //Generates a character array that
 	char* newline = strchr(username,'\n');
 	if(newline)*newline=0;
 	int messagep = GETRSA;
-	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
-	SSCS_object_add_data(obj,"username",username,strlen(username));	
+	SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"username",(byte*)username,strlen((const char*)username));	
 	const char* retptr = SSCS_object_encoded(obj);	
 	SSCS_release(&obj);
 	return retptr;	
@@ -255,8 +256,8 @@ const char* ServerGetMessages(sqlite3* db){ //Generates a character array that c
 	if(!username)return NULL;
 	sscso* obj = SSCS_object();
 	int messagep = MSGREC;
-	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
-	SSCS_object_add_data(obj,"username",username,strlen(username));
+	SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"username",(byte*)username,strlen((const char*)username));
 	const char* retptr = SSCS_object_encoded(obj);
 	SSCS_release(&obj);
 	free(username);
@@ -292,10 +293,10 @@ char* AuthUSR(sqlite3* db){
 	}
 	sscso* obj = SSCS_object();
 	char* username = getMUSER(db);
-	SSCS_object_add_data(obj,"username",username,strlen(username));
+	SSCS_object_add_data(obj,"username",(byte*)username,strlen(username));
 	int messagep = AUTHUSR;
-	SSCS_object_add_data(obj,"msgp",&messagep,sizeof(int));
-	SSCS_object_add_data(obj,"authkey",authkey,strlen(authkey));
+	SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
+	SSCS_object_add_data(obj,"authkey",(byte*)authkey,strlen(authkey));
 	sqlite3_finalize(stmt);
 	char* retptr = SSCS_object_encoded(obj);
 	SSCS_release(&obj);

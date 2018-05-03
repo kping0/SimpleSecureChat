@@ -9,7 +9,8 @@
 /*
  * SimpleSecureChat Serialization Library. Made with Security in mind.
 */
-byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){ size_t i = 0;size_t x = 0;byte* firstbyte = NULL; //Initialize variables
+byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){ 
+	size_t i = 0;size_t x = 0;byte* firstbyte = NULL; //Initialize variables
 	while(1){
 		if(!(i < buf_size))return NULL;
 		if(buf[i] == byteseq[x]){
@@ -18,13 +19,13 @@ byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){ size_t
 			while(1){	
 				if(x == byteseq_len)return firstbyte; //we found the byte sequence
 				else if(!(i < buf_size))return NULL; //exit,have reached buf_size
-				else if(buf[i] == byteseq[x]){x++;i++;} //byte's match,continue
+				else if(buf[i] == byteseq[x]){x++;i++;} //match,continue
 				else{x = 0;firstbyte = NULL;break;} //byte's didnt match,reset
-				
 			}		
 		}	
 		else{i++;} //If byte's dont match add increase the index 
 	}	
+	return NULL;
 }
 sscso *SSCS_object(void){
 	sscso* obj = calloc(1,sizeof(struct SSCS_struct));		
@@ -67,6 +68,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	size_t encoded_size;
 	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
+	if(old_buf_items >= 1000000)return -1; //If more than 1M items exists exit
 	char label[12];
 	sprintf(label,"%zd:\"",old_buf_items+1);
 	int label_len = strlen((const char*)label);
@@ -165,25 +167,14 @@ sscsd* SSCS_object_data(sscso* obj,char* label){
 	size_t allocated = obj->allocated;
 	size_t label_len = strlen((const char*)label);
 	byte* readpointer = memseq(buf_ptr,allocated,(byte*)label,label_len);
-	if(readpointer == NULL){
-		//puts("Label Not Found");
-		//printf("Label Not Found %s\n",label);
-		return NULL;
-	}
+	if(!readpointer)return NULL;
 	readpointer+=label_len;
-	if(readpointer[0] != ':' || readpointer[1] != '"'){
-		//puts("Label Error");
-		return NULL;
-	}
-
+	if(readpointer[0] != ':' || readpointer[1] != '"')return NULL;
 	readpointer+=2;
 	//Readpointer is now at the beginning of the base64 encoded data
 	int i = 0;
 	while(readpointer[i] != '"' && readpointer[i+1] != ';'){ //Run once to get length of string 
-		if(!((readpointer+i)-buf_ptr < (signed)allocated)){
-			//puts("Outsize of memory bounds");
-			return NULL;
-		}
+		if(!((readpointer+i)-buf_ptr < (signed)allocated))return NULL;
 		i++;	
 	}
 	double b64encoded_len = i; 

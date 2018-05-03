@@ -65,7 +65,7 @@ void change_current_user_gui(GtkWidget* widget,gpointer data){
 	gtk_widget_show((GtkWidget*)(pobj->widgets)->chatpartnerlabel);
 
 	//get messages from server & and add stored ones to GUI
-	//getmessages_gui(NULL,pobj);
+	getmessages_gui(pobj->widgets);
 	return;
 }
 
@@ -117,6 +117,9 @@ void add_user_entry_gui(GtkEntry* entry,gpointer data){
 	struct sscswidgets_gui* widgets = data;
 	GtkWidget* contactslist =  widgets->contactslist;
 	char* username = (char*)gtk_entry_get_text(GTK_ENTRY(entry));
+#ifdef DEBUG
+	fprintf(stdout,"trying to add user %s\n",username);
+#endif
 	addnewuser_gui(widgets,username);
 	add_contact_gui(contactslist,widgets,username);	
 	gtk_entry_set_text(entry,"");
@@ -130,6 +133,9 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,char* username){
 	free(gtrsa64);
 	char* rxbuf = calloc(1,4096);
 	BIO_read(((widgets_gui->backend_vars)->connection_variables)->bio_obj,rxbuf,4096);
+#ifdef DEBUG
+	fprintf(stdout,"DEBUG: got usersaobj %s from srv\n",rxbuf);
+#endif
 	if(strcmp(rxbuf,"GETRSA_RSP_ERROR") == 0){
 		puts(rxbuf);
 	} 
@@ -151,67 +157,71 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,char* username){
 		
 	return;
 }
-void getmessages_gui(GtkWidget* notused,gpointer data){ //get message & add them to db
-	(void)notused; //not used.
+gboolean getmessages_gui(void* data){ //get message & add them to db
+	//Get Variables from passed structure
 	sqlite3* db = (((sscvars_gui*)data)->backend_vars)->db;
 	sqlite3_stmt* stmt;
 	BIO* srvconn = ((((sscvars_gui*)data)->backend_vars)->connection_variables)->bio_obj;		
 	EVP_PKEY* priv_evp = (((sscvars_gui*)data)->backend_vars)->privkey;
 	GtkWidget* recvlist = ((sscvars_gui*)data)->recvlist;
+	GtkWidget* messagelist = ((sscvars_gui*)data)->messagelist;
 	char* current_user = *(((sscvars_gui*)data)->current_username);
 	if(!current_user)return;
-	int i = 0;	
-	char* getmsgbuf = (char*)ServerGetMessages(db);		
+	char* getmsgbuf = (char*)ServerGetMessages(db);	//Get buffer to send to server
 	if(!getmsgbuf)return;
+
 	char* decbuf = NULL;
 	char* recvbuf = malloc(200000);
-	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	
+	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	//Send buffer to server
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
-	BIO_read(srvconn,recvbuf,199999);	
+	BIO_read(srvconn,recvbuf,199999); //Read response
 	
 	if(strcmp(recvbuf,"ERROR") != NULL){
 	sscsl* list = SSCS_list_open(recvbuf);
+	int i = 0;	
 	while(1){
-		i++;	
-		sscsd* prebuf =	SSCS_list_data(list,i);	
-		if(!prebuf)break;
-		sscso* obj2 = SSCS_open(prebuf->data);
-		SSCS_data_release(&prebuf);
-		char* sender = SSCS_object_string(obj2,"sender");
-		if(!sender)break;
-		decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
-		if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
-		sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
-		sqlite3_bind_int(stmt,1,getUserUID(sender,db));
-		sqlite3_bind_text(stmt,2,decbuf,-1,0);
-		sqlite3_step(stmt);
-		sqlite3_finalize(stmt);
-		stmt = NULL;
-		SSCS_release(&obj2);
-		free(sender);
-		if(decbuf)free(decbuf);
-	}
-	SSCS_list_release(&list);
+			i++;	
+			sscsd* prebuf =	SSCS_list_data(list,i);	
+			if(!prebuf)break;
+			sscso* obj2 = SSCS_open(prebuf->data);
+			SSCS_data_release(&prebuf);
+			char* sender = SSCS_object_string(obj2,"sender");
+			if(!sender)break;
+			decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
+			if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
+			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
+			sqlite3_bind_int(stmt,1,getUserUID(sender,db));
+			sqlite3_bind_text(stmt,2,decbuf,-1,0);
+			sqlite3_step(stmt);
+			sqlite3_finalize(stmt);
+			stmt = NULL;
+			SSCS_release(&obj2);
+			free(sender);
+			if(decbuf)free(decbuf);
+		}
+		SSCS_list_release(&list);
 	}
 	free(recvbuf);
 	int currentuserUID = getUserUID(current_user,db);
-	printf("UID for user %s is %i\n",current_user,currentuserUID);
+#ifdef DEBUG
+	fprintf(stdout,"DEBUG: Current user %s has id %i\n",current_user,currentuserUID);
+#endif
 	if(currentuserUID == -1)return;
-	sqlite3_prepare_v2(db,"select message from messages where uid=?1 AND uid2=1",-1,&stmt,NULL);
-	sqlite3_bind_int(stmt,1,currentuserUID);	
-	while(sqlite3_step(stmt) == SQLITE_ROW){
-		append_list_string_gui(recvlist,sqlite3_column_text(stmt,0));
-		append_list_string_gui(((sscvars_gui*)data)->messagelist," ");
-	}
-	sqlite3_finalize(stmt);
-	stmt = NULL;	
-	sqlite3_prepare_v2(db,"select message from messages where uid=1 AND uid2=?1",-1,&stmt,NULL);
+
+	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 OR uid2=?2",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,currentuserUID);
+	sqlite3_bind_int(stmt,2,currentuserUID);
 	while(sqlite3_step(stmt) == SQLITE_ROW){
-		append_list_string_gui(((sscvars_gui*)data)->messagelist,sqlite3_column_text(stmt,0));
-		append_list_string_gui(recvlist," ");
-	
+		int sqluid = sqlite3_column_int(stmt,0);
+		if(sqluid == 1){
+			append_list_string_gui(messagelist,sqlite3_column_text(stmt,1));
+			append_list_string_gui(recvlist," ");
+		}	
+		else if(sqluid == currentuserUID){
+			append_list_string_gui(recvlist,sqlite3_column_text(stmt,1));
+			append_list_string_gui(((sscvars_gui*)data)->messagelist," ");
+		}
 	}
 	sqlite3_finalize(stmt);
 	return;

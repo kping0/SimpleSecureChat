@@ -27,6 +27,7 @@
 //You can only have a GUI or a CLI, not both.. if both are defined SSC will not work
 #define SSC_GUI /* To have a Gtk+ GUI */
 //#define SSC_CLI /* Uncomment for CLI version */
+//#define DEBUG
 
 #define HOST_NAME "127.0.0.1" //SSC Server IP
 #define HOST_PORT "5050" //SSC Server Port

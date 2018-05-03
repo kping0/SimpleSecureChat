@@ -25,7 +25,7 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 		return NULL;	
 	}
 	sscso* obj = SSCS_object();
-	SSCS_object_add_data(obj,"recipient",username,strlen(username));
+	SSCS_object_add_data(obj,"recipient",(byte*)username,strlen((const char*)username));
 	EVP_PKEY* userpubk = get_pubk_username(username,db);
 	if(userpubk == NULL){
 		puts("Could not get Users Public Key, maybe not in DB?");
@@ -48,8 +48,8 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 	//A Way to impliment the sign-then-encrypt with good context protection
 
 	sscso* sigmsg = SSCS_object();
-	SSCS_object_add_data(sigmsg,"msg",(byte*)message,strlen(message));
-	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen(username));
+	SSCS_object_add_data(sigmsg,"msg",(byte*)message,strlen((const char*)message));
+	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen((const char*)username));
 	byte *sig = NULL;
 	size_t sigl = 0;
 	int rc = signmsg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
@@ -68,14 +68,14 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 	SSCS_object_add_data(sigmsg2,"sig",sig,sigl);
 	SSCS_object_add_data(sigmsg2,"sscso",(byte*)sigmsg->buf_ptr,sigmsg->allocated);
 	//Encrypt message 
-	int enc_len = envelope_seal(&userpubk,SSCS_object_encoded(sigmsg2),SSCS_object_encoded_size(sigmsg2),&ek,&ekl,iv,enc_buf);
+	int enc_len = envelope_seal(&userpubk,(byte*)SSCS_object_encoded(sigmsg2),SSCS_object_encoded_size(sigmsg2),&ek,&ekl,iv,enc_buf);
 	if(enc_len <= 0){
 		puts("Error Encrypting Message!");
 		return NULL;	
 	}
 	int message_purpose = MSGSND;
-	SSCS_object_add_data(obj,"msgp",&message_purpose,sizeof(int));
-	SSCS_object_add_data(obj,"ek",ek,ekl);
+	SSCS_object_add_data(obj,"msgp",(byte*)&message_purpose,sizeof(int));
+	SSCS_object_add_data(obj,"ek",(byte*)ek,ekl);
 	SSCS_object_add_data(obj,"enc_buf",enc_buf,enc_len);
 	SSCS_object_add_data(obj,"iv",iv,EVP_MAX_IV_LENGTH);
 	const char* retptr = SSCS_object_encoded(obj);
@@ -98,7 +98,7 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 		return NULL;	
 	}
 	
-	sscso* obj = SSCS_open(encrypted_buffer);
+	sscso* obj = SSCS_open((byte*)encrypted_buffer);
 
 	sscsd* enc_buf_data = SSCS_object_data(obj,"enc_buf");
 	if(!enc_buf_data)return NULL;
@@ -124,7 +124,7 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 	int serializedobj3l = serializedobj3_data->len;
 	sscso* obj3 = SSCS_open(serializedobj3);
 
-	char* sender = SSCS_object_string(obj,"sender");
+	char* sender = (char*)SSCS_object_string(obj,"sender");
 	EVP_PKEY *userpubk = get_pubk_username(sender,db);
 	if(!userpubk){
 		printf("error retrieving public key for %s",sender);	
@@ -165,7 +165,7 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 		return NULL;
 	}
 
-	char* f_buf = SSCS_object_string(obj3,"msg");
+	char* f_buf = (char*)SSCS_object_string(obj3,"msg");
 
 	SSCS_release(&obj);
 	SSCS_release(&obj2);

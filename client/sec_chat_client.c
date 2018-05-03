@@ -56,23 +56,21 @@
 typedef unsigned char byte; //Create type "byte" NOTE: only when the build system version of type "char" is 8bit
 
 int pexit(char* error){
-	printf("Exiting, error : %s\n",error);
+	fprintf(stdout,"Exiting, error : %s\n",error);
 	exit(1);
 }
+#ifdef SSC_GUI
+gboolean timedupdate_gui(void* data){
+	clear_messages_gui(data);	
+	getmessages_gui(data);
+	return 1;
+}
+#endif /* SSC_GUI */
 //Startpoint
 int main(void){
 	puts("Starting secure chat application...");
 	puts("Get the source at: ('https://github.com/kping0/simplesecurechat/client')");
 	puts("Host your own server with ('https://github.com/kping0/simplesecurechat/server')");
-	#ifdef SSC_VERIFY_VARIABLES
-	puts("SSC_VERIFY_VARIABLES IS DEFINED.");
-	#endif
-	#ifndef SSC_VERIFY_VARIABLES
-	puts("SSC_VERIFY_VARIABLES IS NOT DEFINED");
-	#endif
-	#ifdef SSC_GUI
-	puts("SSC_GUI IS DEFINED");
-	#endif
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
@@ -135,14 +133,6 @@ int main(void){
 	}
 #endif
 	
-//test
-#ifdef DEBUG
-	sscso* obj = SSCS_object();
-	int testint = 45;
-	SSCS_object_add_data(obj,"msgp",&testint,sizeof(int));
-	BIO_write(tls_vars->bio_obj,SSCS_object_encoded(obj),SSCS_object_encoded_size(obj));
-	BIO_write(tls_vars->bio_obj,SSCS_object_encoded(obj),SSCS_object_encoded_size(obj));
-#endif
 //register your user
 
 	printf("Your username is: %s, trying to register it with the server\n",getMUSER(db));
@@ -151,6 +141,12 @@ int main(void){
 	assert(regubuf != NULL && strlen(regubuf) > 0);
 	#endif
 	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
+	char rsp[3];
+	memset(rsp,0,3);			
+	BIO_read(tls_vars->bio_obj,rsp,3);
+	if(strncmp(rsp,"ERR",3) == 0){
+		fprintf(stderr,"Error registering user, maybe user exits ?\n");
+	}
 	free(regubuf);
 
 //Authenticate USER
@@ -173,7 +169,6 @@ int main(void){
 	backend_vars->privkey = priv_evp;
 	backend_vars->db = db;
 	backend_vars->connection_variables = tls_vars;
-
 	GtkWidget *window;
 	gtk_init(NULL,NULL);
 	GtkBuilder* gtkBuilder = gtk_builder_new();		
@@ -201,9 +196,9 @@ int main(void){
 	g_signal_connect(G_OBJECT(window),"destroy",G_CALLBACK(gtk_main_quit),NULL);
 	g_signal_connect(G_OBJECT(sendmessagetext),"activate",G_CALLBACK(send_message_entry_gui),widgetsobj);
 	g_signal_connect(G_OBJECT(addusertext),"activate",G_CALLBACK(add_user_entry_gui),widgetsobj);
-	g_signal_connect(G_OBJECT(getmsg),"clicked",G_CALLBACK(getmessages_gui),widgetsobj);
 	init_gui(widgetsobj); //Add known users to sidebar (this is NOT gtk_init)
 	gtk_widget_show_all(window);
+	g_timeout_add(1000,&timedupdate_gui,widgetsobj);
 	gtk_main();
 	goto CLEANUP;
 #endif /* SSC_GUI */

@@ -180,13 +180,12 @@ int main(void){
 	GtkWidget *sendmessagetext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"sendmessagetext"));
 	GtkWidget *addusertext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"addusertext"));
 	GtkWidget *chatpartnerlabel = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"currentchatpartner"));
-	GtkWidget *getmsg = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"getmsg"));
 	GtkWidget *recvlist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"recvlist"));
 	struct sscswidgets_gui* widgetsobj = malloc(sizeof(struct sscswidgets_gui));
 	widgetsobj->window = window;
 	widgetsobj->contactslist = contactslist;
 	widgetsobj->messagelist = messagelist;
-	widgetsobj->chatpartnerlabel = chatpartnerlabel;
+	widgetsobj->chatpartnerlabel = (GtkLabel*)chatpartnerlabel;
 	widgetsobj->recvlist = recvlist;
 	widgetsobj->backend_vars = backend_vars;
 	char* username = NULL;

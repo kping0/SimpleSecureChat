@@ -25,7 +25,7 @@
 */
 
 //keep defined for additional DEBUG information
-//#define DEBUG
+#define DEBUG
 
 /* Settings for MySQL (MariaDB) */
 #define SSCDB_SRV "localhost"

@@ -35,7 +35,9 @@ int my_mysql_query(MYSQL* con,char* query){ //mysql_query() with error checking
 }
 
 void init_DB(void){ //prepare database
+#ifdef DEBUG
 	fprintf(stdout,"Info: MySQL client version-> %s\n",mysql_get_client_info());
+#endif /* DEBUG */
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
 		fprintf(stderr,"Error: %s\n",mysql_error(con));
@@ -81,7 +83,7 @@ int create_socket(int port){ //bind socket s to port and return socket s
     int enable = 1;
     setsockopt(s,SOL_SOCKET,SO_REUSEADDR,&enable,sizeof(int));
     if (bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-	fprintf(stderr,"Error: Unable to bind\n");
+	fprintf(stderr,"Error: Unable to bind, is server already running?\n");
 	exit(EXIT_FAILURE);
     }
 
@@ -125,14 +127,14 @@ SSL_CTX *create_context()
 
 void configure_context(SSL_CTX *ctx)
 {
-
+    SSL_CTX_set_default_passwd_cb_userdata(ctx,SSCS_KEYFILE_PW);
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx,SSCS_CERTFILE , SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx,SSCS_KEYFILE, SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
@@ -236,7 +238,9 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 
 void ssc_sig_handler(int sig){ //Function to handle signals
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
+#ifdef DEBUG
 			fprintf(stdout,"\nCaught Signal... Exiting\n");
+#endif /* DEBUG */
 			close(sock);
 			exit(EXIT_SUCCESS);
 		}

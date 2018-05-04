@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ "$1" == "start" ] || [ "$1" == "START" ];then
+	echo "Starting Server"
+	./SSCServer & disown
+elif [ "$1" == "stop" ] || [ "$1" == "STOP" ];then
+	echo "Stopping Server"
+	pkill SSCServer	
+else
+	echo "Usage: server_ctl.sh [START|STOP]"
+fi

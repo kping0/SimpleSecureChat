@@ -22,3 +22,5 @@ Dependencies:
       ./server_ctl start/stop
       
   Note that the Client validates the server provided certificate against the file path defined in "client/settings.h" (definition HOST_CERT), so if you are setting up your own server you need to copy the generated server public key(cert.pem) to your client directory and set HOST_CERT accordingly. 
+
+The Default logfile is "SSCServer.log".

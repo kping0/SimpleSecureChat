@@ -21,18 +21,23 @@
 #define SSC_SETTINGSHFSRV
 
 /*
-* All configurable settings for SSC Server
+* All configurable settings for SSCServer
 */
 
-//keep defined for additional DEBUG information
-#define DEBUG
+//#define DEBUG // Uncomment for extra DEBUG information
 
-/* Settings for MySQL (MariaDB) */
+/* Settings for MySQL/MariaDB */
 #define SSCDB_SRV "localhost"
 #define SSCDB_USR "SSCServer"
 #define SSCDB_PASS "passphrase"
 
-#define SSC_VERIFY_VARIABLES //sanity checks variables at a minimal cost of performance for security (comment out for tiny increase in speed)
+#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
+#define SSCS_LOGFILE "SSCServer.log" //Logfile to write to 
+
+#define SSCS_CERTFILE "cert.pem" //certificate file
+#define SSCS_KEYFILE "key.pem" //Key file
+#define SSCS_KEYFILE_PW "test" //key file password
+#define SSC_VERIFY_VARIABLES //sanity check variables 
 
 //msgp - client/server response definitions
 #define MSGSND 1 //Message Send(normal message)

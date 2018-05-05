@@ -1,5 +1,4 @@
 
-
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -18,10 +17,10 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <signal.h>
 #include <assert.h>
 #include <errno.h>
 #include <unistd.h>
@@ -47,6 +46,10 @@
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 int main(void){
+#ifdef SSCS_LOGTOFILE
+    FILE* stdoutl = freopen(SSCS_LOGFILE,"a+",stdout);
+    FILE* stderrl = freopen(SSCS_LOGFILE,"a+",stderr); 
+#endif /* SSCS_LOGTOFILE */
 
     //register signal handlers..
     signal(SIGINT,ssc_sig_handler);
@@ -68,15 +71,16 @@ int main(void){
     configure_context(ctx);
     //Setup listening socket
     sock = create_socket(5050);
-
-    /* Handle connections */
+   /* Handle connections */
     while(1) {
         struct sockaddr_in addr;
         uint len = sizeof(addr);
 	
 	// Accept Client Connections.
         int client = accept(sock, (struct sockaddr*)&addr, &len);
+#ifdef DEBUG
 	fprintf(stdout,"Info: Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
+#endif /* DEBUG */
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
 	* by the function childexit_handler
@@ -248,6 +252,10 @@ int main(void){
 							}				
 						}
 						SSCS_release(&obj);
+#ifdef SSCS_LOGTOFILE
+						fflush(stdoutl);
+						fflush(stderrl);
+#endif /* SSCS_LOGTOFILE */
 					}
 				}
 				else{
@@ -263,6 +271,10 @@ int main(void){
 				goto end;
 			}
 			SSCS_release(&obj0);
+#ifdef SSCS_LOGTOFILE
+			fflush(stdoutl);
+			fflush(stderrl);
+#endif /* SSCS_LOGTOFILE */
 		}
 	end: //cleanup & exit
 	#ifdef DEBUG
@@ -287,6 +299,10 @@ int main(void){
     close(sock);
     SSL_CTX_free(ctx);
     cleanup_openssl();
+#ifdef SSCS_LOGTOFILE
+    fclose(stderrl);
+    fclose(stdoutl);
+#endif /* SSCS_LOGTOFILE */
     return 0;
 }
 

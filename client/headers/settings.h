@@ -26,7 +26,7 @@
 
 //You can only have a GUI or a CLI, not both.. if both are defined SSC will not work
 #define SSC_GUI /* To have a Gtk+ GUI */
-
+//#define SSC_CLI
 /*
  * Uncomment below for debug information
  */
@@ -36,9 +36,15 @@
  * Default Server Configuration (Will use the default Server)
  * To change the Server change the HOST_NAME & HOST_CERT to match your servers
  */
+
+/*
 #define HOST_NAME "52.14.103.245" //Default Server IP
 #define HOST_PORT "5050" //SSC Port
 #define HOST_CERT "default/public.pem" //Default Server Certificate (Change path if your hosting your own server)
+*/
+#define HOST_NAME "127.0.0.1"
+#define HOST_PORT "5050"
+#define HOST_CERT "public.pem"
 
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
@@ -46,18 +52,5 @@
 
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename(Will be generated if not found)
 #define SSC_VERIFY_VARIABLES //error check variables
-
-//Message Purposes
-#define MSGSND 1 //Message Send(normal message)
-#define REGRSA 2 //Register user in association with an rsa public key
-#define GETRSA 3 //Get user public key from server
-#define MSGREC 4 //Get new messages
-#define AUTHUSR 9 //Purpose of message is to authenticate to the server.
-//Server responses to the above.
-#define MSGSND_RSP 5  
-#define MSGREC_RSP 6
-#define REGRSA_RSP 7
-#define GETRSA_RSP 8
-#define AUTHUSR_RSP 10
 
 #endif

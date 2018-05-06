@@ -17,29 +17,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef SSC_SETTINGSHFSRV
-#define SSC_SETTINGSHFSRV
 
-/*
-* All configurable settings for SSCServer
-*/
+#ifndef SSCSHASHING_HF
+#define SSCSHASHING_HF
 
-/* Miscellaneous */
-//#define DEBUG //uncomment for additional debug info
-#define SSC_VERIFY_VARIABLES //sanity check variables 
+#include <stdio.h>
+#include <stdlib.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#include "base64.h"
 
-/* Settings for MySQL/MariaDB */
-#define SSCDB_SRV "localhost" //mysql server
-#define SSCDB_USR "SSCServer" //mysql username
-#define SSCDB_PASS "passphrase" //mysql password 
+#define SSCS_HASH_VALID 1
+#define SSCS_HASH_INVALID 2
 
-/* Log Settings */
-#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
-#define SSCS_LOGFILE "SSCServer.log" //Logfile to write to 
+typedef unsigned char byte;
 
-/* Certificate file Settings */
-#define SSCS_CERTFILE "cert.pem" //certificate file
-#define SSCS_KEYFILE "key.pem" //Key file
-#define SSCS_KEYFILE_PW "test" //key file password
+struct SSCS_HASH_STRUCT{
+	byte* hash;
+	size_t hashl;
+	byte* salt;
+	size_t saltl;
+};
+typedef struct SSCS_HASH_STRUCT SSCS_HASH;
 
-#endif
+byte* memncat(byte* first,size_t firstl,byte* second,size_t secondl); //concatenate memory blocks
+
+SSCS_HASH* SSCS_createhash(byte* data,size_t datal); //get b64_sha256 for data (with salt)
+
+int SSCS_comparehash(byte* data,size_t datal,SSCS_HASH* originalhash); //compare sha256(data) to orig
+
+void SSCS_freehash(SSCS_HASH** hash);
+
+#endif /* SSCSHASHING_HF */

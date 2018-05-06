@@ -39,6 +39,20 @@
 #include "settings.h"
 #include "base64.h"
 
+//Message Purposes
+#define MSGSND 1 //Message Send(normal message)
+#define REGRSA 2 //Register user in association with an rsa public key
+#define GETRSA 3 //Get user public key from server
+#define MSGREC 4 //Get new messages
+#define AUTHUSR 9 //Purpose of message is to authenticate to the server.
+//Server responses to the above.
+#define MSGSND_RSP 5  
+#define MSGREC_RSP 6
+#define REGRSA_RSP 7
+#define GETRSA_RSP 8
+#define AUTHUSR_RSP 10
+
+
 sqlite3* initDB(char* dbfname);
 
 void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db,char* authkey);

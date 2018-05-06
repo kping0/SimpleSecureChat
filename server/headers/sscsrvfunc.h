@@ -46,8 +46,21 @@
 #include "serialization.h"
 #include "settings.h"
 #include "base64.h"
+#include "hashing.h"
 
 #define UNUSED(x)((void)x)
+
+#define MSGSND 1 //Message Send(normal message)
+#define MSGREC 4 //Get new messages 
+#define REGRSA 2 //Register user in association with an rsa public key
+#define GETRSA 3 //Get user public key
+#define MSGSND_RSP 5 //Server response to MSGSND
+#define MSGREC_RSP 6 //Server response to MSGREC
+#define REGRSA_RSP 7 //Server response to REGRSA
+#define GETRSA_RSP 8 //Server response to GETRSA
+#define AUTHUSR 9 //Sent from client to authenticate
+
+
 extern int sock;
 
 int create_socket(int port);
@@ -72,8 +85,6 @@ int getUserUID(char* username,MYSQL *db);
 
 int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message);
 
-//sqlite3* initDB(char* dbfname); /* DEPRECATED */
-
 void exit_mysql_err(MYSQL* con); //print error message and exit
 
 int my_mysql_query(MYSQL* con,char* query); //mysql_query() with error checking
@@ -86,6 +97,6 @@ const char* GetEncodedRSA(char* username, MYSQL* db);
 
 char* GetUserMessagesSRV(char* username,MYSQL* db);
 
-char* getUserAuthKey(char* username, MYSQL* db); //gets authkey of user 'username', used for authentication
+SSCS_HASH* getUserAuthKeyHash(char* username,MYSQL* db);
 
-#endif
+#endif /* SSCSRVFUNC */

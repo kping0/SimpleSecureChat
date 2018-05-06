@@ -43,6 +43,7 @@
 #include "headers/settings.h" //settings for ssc
 #include "headers/base64.h" //MIT base64 function (BSD LICENSE)
 #include "headers/serialization.h" //SSCS Library
+#include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 int main(void){
@@ -69,25 +70,23 @@ int main(void){
     ctx = create_context();
 
     configure_context(ctx);
-    //Setup listening socket
-    sock = create_socket(5050);
+    sock = create_socket(5050); //Setup listening socket
    /* Handle connections */
     while(1) {
         struct sockaddr_in addr;
         uint len = sizeof(addr);
 	
-	// Accept Client Connections.
-        int client = accept(sock, (struct sockaddr*)&addr, &len);
+        int client = accept(sock, (struct sockaddr*)&addr, &len); //Accept Client Connections.
 #ifdef DEBUG
 	fprintf(stdout,"Info: Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
 #endif /* DEBUG */
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
-	* by the function childexit_handler
+	* by childexit_handler
 	*/
 	pid_t pid = fork();
 	if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 
-		signal(SIGINT,SIG_DFL);
+		signal(SIGINT,SIG_DFL); //unbind sigint for segfault
 		if (client < 0) {
 		    perror("Unable to accept");
 		    exit(EXIT_FAILURE);
@@ -168,19 +167,17 @@ int main(void){
 					goto end;
 				}
 				char* authusername = (char*)SSCS_object_string(obj0,"username");
-				char* userauthk_db = getUserAuthKey(authusername,db);
-				if(!userauthk_db){
+				SSCS_HASH* hash = getUserAuthKeyHash(authusername,db);
+				if(!hash){
 					fprintf(stderr,"Error: Authkey returned by getUserAuthKey is NULL, exiting\n");
 					goto end;
 				}
-				int memcmpres = memcmp(userauthk_db,userauthk,256);
-				if(memcmpres == 0){ //Compare stored authk to sent authk
+				if(SSCS_comparehash((byte*)userauthk,strlen(userauthk),hash) == SSCS_HASH_VALID){
 	#ifdef DEBUG
 					fprintf(stdout,"Update: User \"%s\" authenticated.\n",authusername);
 	#endif /* DEBUG */
 					SSCS_release(&obj0);
-					free(userauthk_db);
-					userauthk_db = NULL; //for sanities sake set to NULL
+					SSCS_freehash(&hash);
 	/*
 	 * Enter Second loop after authentication
 	 */
@@ -260,8 +257,7 @@ int main(void){
 				}
 				else{
 					printf("User %s failed to authenticate.\n",authusername);
-					free(userauthk_db);
-					userauthk_db = NULL; //for sanities sake
+					SSCS_freehash(&hash);
 				}	
 			}
 			else{

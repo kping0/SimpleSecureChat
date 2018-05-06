@@ -214,11 +214,6 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         bind[2].buffer_length=sizeof(int);
         bind[2].is_null=0;
         bind[2].length=0;
-//        bind[3].buffer_type=MYSQL_TYPE_STRING;
-//        bind[3].buffer=authkey;
-//        bind[3].buffer_length=strlen(authkey);
-//        bind[3].is_null=0;
-//        bind[3].length=0;
 	bind[3].buffer_type=MYSQL_TYPE_STRING;
 	bind[3].buffer=hash->hash;
 	bind[3].buffer_length=hash->hashl;

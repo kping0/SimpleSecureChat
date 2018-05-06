@@ -18,8 +18,8 @@
 # *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # */
 
-SSCServer: main.o sscsrvfunc.o base64.o serialization.o
-	gcc -o SSCServer base64.o sscsrvfunc.o main.o serialization.o `mysql_config --cflags --libs` -lcrypto -lssl -Wall -Wextra -O
+SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o
+	gcc -o SSCServer base64.o sscsrvfunc.o main.o serialization.o hashing.o `mysql_config --cflags --libs` -lcrypto -lssl -Wall -Wextra -O
 	rm -f *.o
 main.o: secure_chat_server.c
 	gcc -o main.o -c secure_chat_server.c `mysql_config --cflags --libs` -lcrypto -lssl -Wall -Wextra -O -static 
@@ -29,6 +29,8 @@ serialization.o: headers/serialization.c headers/serialization.h
 	gcc -o serialization.o -c headers/serialization.c -Wall -Wextra -O -static 
 base64.o: headers/base64.h headers/base64.c
 	gcc -o base64.o -c headers/base64.c -Wall -Wextra -O -static 
+hashing.o: headers/hashing.c headers/hashing.h
+	gcc -o hashing.o -c headers/hashing.c -Wall -Wextra -O -static -lcrypto 
 clean:
 	rm -f *.o SSCServer* temp 
 gitprep: clean

@@ -18,21 +18,23 @@
  */
 
 #include "sscsrvfunc.h"
+
 void pexit(char* errormsg){
 	fprintf(stderr,"Error: %s\n",errormsg);
 	exit(1);
-}
+} /* pexit */
+
 void exit_mysql_err(MYSQL* con){ //print exit message and exit
 	fprintf(stderr,"Error: %s\n",mysql_error(con));
 	mysql_close(con);
 	exit(1);	
-}
+} /* exit_mysql_err */
 
 int my_mysql_query(MYSQL* con,char* query){ //mysql_query() with error checking
 	int retval = mysql_query(con,query);
 	if(retval)exit_mysql_err(con);
 	return retval;
-}
+} /* my_mysql_query */
 
 void init_DB(void){ //prepare database
 #ifdef DEBUG
@@ -52,10 +54,10 @@ void init_DB(void){ //prepare database
 	}
 //Create Messages Database & KnownUsers Database
 	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS MESSAGES(MSGID INT AUTO_INCREMENT PRIMARY KEY,RECVUID INTEGER NOT NULL,MESSAGE TEXT NOT NULL)");
-	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS KNOWNUSERS(UID INT AUTO_INCREMENT PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INT NOT NULL,AUTHKEY TEXT NOT NULL)");
+	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS KNOWNUSERS(UID INT AUTO_INCREMENT PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INT NOT NULL,AUTHKEY TEXT NOT NULL,SALT TEXT)");
 	mysql_close(con); 
 	return;
-}
+} /* init_DB */
 
 MYSQL* get_handle_DB(void){ //return active handle to database
 	MYSQL* con = mysql_init(NULL);
@@ -65,7 +67,7 @@ MYSQL* get_handle_DB(void){ //return active handle to database
 	}
 	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,"SSCServerDB",0,NULL,0))exit_mysql_err(con);
 	return con;	
-}
+} /* get_handle_DB */
 
 int create_socket(int port){ //bind socket s to port and return socket s
     int s = 0;
@@ -95,21 +97,18 @@ int create_socket(int port){ //bind socket s to port and return socket s
     assert(s != 0);
     #endif
     return s;
-}
+} /* create_socket */
 
-void init_openssl()
-{ 
+void init_openssl(){ 
     SSL_load_error_strings();	
     OpenSSL_add_ssl_algorithms();
-}
+} /* init_openssl */
 
-void cleanup_openssl()
-{
+void cleanup_openssl(){
     EVP_cleanup();
-}
+} /* cleanup_openssl */
 
-SSL_CTX *create_context()
-{
+SSL_CTX *create_context(){
     const SSL_METHOD *method;
     SSL_CTX *ctx;
 
@@ -123,10 +122,9 @@ SSL_CTX *create_context()
     }
 
     return ctx;
-}
+} /* create_context */
 
-void configure_context(SSL_CTX *ctx)
-{
+void configure_context(SSL_CTX *ctx){
     SSL_CTX_set_default_passwd_cb_userdata(ctx,SSCS_KEYFILE_PW);
     /* Set the key and cert */
     if (SSL_CTX_use_certificate_file(ctx,SSCS_CERTFILE , SSL_FILETYPE_PEM) <= 0) {
@@ -138,7 +136,7 @@ void configure_context(SSL_CTX *ctx)
         ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
-}
+} /* configure_context */
 
 int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, returns 1 if true, 0 if false
 //Create Variables for STUPID bind system for MYSQL
@@ -180,24 +178,26 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 		mysql_stmt_close(stmt);
 		return 0;
 	}
-}
+} /* checkforUser */
+
 int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ //Add User to database, returns 1 on success,0 on error
 //        printf("Trying to add user: %s,b64rsa is %s, w len of %i, authkey is %s\n",username,b64rsa,rsalen,authkey);
+	
 	MYSQL_STMT* stmt = mysql_stmt_init(db);
 	if(!stmt){
                 fprintf(stderr,"Error: Failed to initialize stmt -> addUser2DB\n");
                 mysql_close(db);
                 exit(1);
         }
-      char* statement = "INSERT INTO KNOWNUSERS VALUES(NULL,?,?,?,?)";
+      char* statement = "INSERT INTO KNOWNUSERS VALUES(NULL,?,?,?,?,?)";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
                 fprintf(stderr,"Error: stmt prepare failed (%s) -> addUser2DB \n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
-
-        MYSQL_BIND bind[4];
+	SSCS_HASH* hash = SSCS_createhash((byte*)authkey,strlen(authkey));
+        MYSQL_BIND bind[5];
         memset(bind,0,sizeof(bind));
         bind[0].buffer_type=MYSQL_TYPE_STRING;
         bind[0].buffer=username;
@@ -214,11 +214,12 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         bind[2].buffer_length=sizeof(int);
         bind[2].is_null=0;
         bind[2].length=0;
-        bind[3].buffer_type=MYSQL_TYPE_STRING;
-        bind[3].buffer=authkey;
-        bind[3].buffer_length=strlen(authkey);
-        bind[3].is_null=0;
-        bind[3].length=0;
+	bind[3].buffer_type=MYSQL_TYPE_STRING;
+	bind[3].buffer=hash->hash;
+	bind[3].buffer_length=hash->hashl;
+	bind[4].buffer_type=MYSQL_TYPE_STRING;
+	bind[4].buffer=hash->salt;
+	bind[4].buffer_length=hash->saltl;
         if(mysql_stmt_bind_param(stmt,bind)){
                 fprintf(stderr,"Error: binding stmt param (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
@@ -233,8 +234,9 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
                 exit(1);
         }
         mysql_stmt_close(stmt);
+	SSCS_freehash(&hash);
         return 1; //return success
-}
+} /* addUser2DB */
 
 void ssc_sig_handler(int sig){ //Function to handle signals
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
@@ -253,7 +255,7 @@ void ssc_sig_handler(int sig){ //Function to handle signals
 		else{
 			exit(EXIT_FAILURE);	
 		}
-}
+} /* ssc_sig_handler */
 
 int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is passed in args (to add a message to db for ex.)
        if(!username){
@@ -323,7 +325,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
                 return usruid;
         }
         return -1;
-}
+} /* getUserUID */
 
 int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
         MYSQL_STMT* stmt = mysql_stmt_init(db);
@@ -367,7 +369,7 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
                 return 1;
         }
         return 0;
-}
+} /* AddMSG2DB */
 
 const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns an encoded user RSA key.
 
@@ -462,7 +464,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         free(rsapub64);
         mysql_stmt_close(stmt);
         return retptr;
-}
+} /* GetEncodedRSA */
 
 char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encoded user messages
         int usruid = getUserUID(username,db);
@@ -580,7 +582,7 @@ while(1){
         mysql_stmt_close(stmt2);
 
         return retptr;
-}
+} /* GetUserMessagesSRV */
 
 
 void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills all zombie processes
@@ -588,9 +590,9 @@ void childexit_handler(int sig){ //Is registered to the Signal SIGCHLD, kills al
 	int saved_errno = errno;
 	while(waitpid((pid_t)(-1),0,WNOHANG) > 0){}
 	errno = saved_errno;
-}
+} /* childexit_handler */
 
-char* getUserAuthKey(char* username, MYSQL* db){
+SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         char* newline = strchr(username,'\n');
         if( newline ) *newline = 0;
         MYSQL_STMT* stmt = mysql_stmt_init(db);
@@ -599,7 +601,7 @@ char* getUserAuthKey(char* username, MYSQL* db){
                 mysql_close(db);
                 exit(1);
         }
-        char* statement = "SELECT AUTHKEY FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
+        char* statement = "SELECT AUTHKEY,SALT FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
                 fprintf(stderr,"Error: mysql_stmt_prepare() error (%s) -> getUserAuthKey\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
@@ -620,11 +622,14 @@ char* getUserAuthKey(char* username, MYSQL* db){
 
         char* authkey = NULL;
         size_t authkey_len = 0;
-        MYSQL_BIND result[1];
+	char* salt = NULL;
+	size_t salt_len = 0;
+        MYSQL_BIND result[2];
         memset(result,0,sizeof(result));
         result[0].buffer_type=MYSQL_TYPE_STRING;
         result[0].length=&authkey_len; //get length to allocate buffer
-
+	result[1].buffer_type=MYSQL_TYPE_STRING;
+	result[1].length=&salt_len;
         if(mysql_stmt_execute(stmt)){
                 fprintf(stderr,"Error: mysql_stmt_execute err (%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
@@ -651,25 +656,29 @@ char* getUserAuthKey(char* username, MYSQL* db){
                 mysql_stmt_close(stmt);
                 return NULL;
         }
-        if(authkey_len >= 256){
-                authkey = malloc(authkey_len); //allocate buffer for string
-                memset(result,0,sizeof(result)); //reset result 
-                result[0].buffer_type=MYSQL_TYPE_STRING;
-                result[0].buffer=authkey;
-                result[0].buffer_length=authkey_len;
-                mysql_stmt_fetch_column(stmt,result,0,0); //get string
-        }
-        else{
-                mysql_stmt_close(stmt);
-#ifdef DEBUG
-                fprintf(stderr,"Error: authkey_ley !>= 256 maybe user \"%s\" does not exist?->getUserAuthKey\n",username);
-#endif /* DEBUG */
-                return NULL;
-        }
-#ifdef DEBUG
-//        fprintf(stdout,": getUserAuthKey.authkey->>%s)\n",authkey);
-#endif /* DEBUG */
+        authkey = malloc(authkey_len); //allocate buffer for string
+	salt = malloc(salt_len);
+        memset(result,0,sizeof(result)); //reset result 
+        result[0].buffer_type=MYSQL_TYPE_STRING;
+        result[0].buffer=authkey;
+        result[0].buffer_length=authkey_len;
+        mysql_stmt_fetch_column(stmt,result,0,0); //get string
+	memset(result,0,sizeof(result));
+	result[0].buffer_type=MYSQL_TYPE_STRING;
+	result[0].buffer=salt;
+	result[0].buffer_length=salt_len;	
+	mysql_stmt_fetch_column(stmt,result,1,0); //get string
         mysql_stmt_close(stmt);
-        return authkey;
-}
+	SSCS_HASH* retstruct = malloc(sizeof(SSCS_HASH));
+	retstruct->hash=(byte*)authkey;	
+	retstruct->hashl=authkey_len;
+	retstruct->salt=(byte*)salt;
+	retstruct->saltl=salt_len;
+#ifdef DEBUG
+	fprintf(stdout,"DEBUG: Salt is ");
+	fprintf(stdout,"%s\n",salt);
+	
+#endif /* DEBUG */
+	return retstruct;
+} /* getUserAuthKeyHash */
 

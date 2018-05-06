@@ -37,14 +37,9 @@
  * To change the Server change the HOST_NAME & HOST_CERT to match your servers
  */
 
-/*
 #define HOST_NAME "52.14.103.245" //Default Server IP
 #define HOST_PORT "5050" //SSC Port
 #define HOST_CERT "default/public.pem" //Default Server Certificate (Change path if your hosting your own server)
-*/
-#define HOST_NAME "127.0.0.1"
-#define HOST_PORT "5050"
-#define HOST_CERT "public.pem"
 
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)

@@ -54,7 +54,7 @@ void init_DB(void){ //prepare database
 	}
 //Create Messages Database & KnownUsers Database
 	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS MESSAGES(MSGID INT AUTO_INCREMENT PRIMARY KEY,RECVUID INTEGER NOT NULL,MESSAGE TEXT NOT NULL)");
-	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS KNOWNUSERS(UID INT AUTO_INCREMENT PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INT NOT NULL,AUTHKEY TEXT NOT NULL,SALT TEXT)");
+	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS KNOWNUSERS(UID INT AUTO_INCREMENT PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INT NOT NULL,SHA256 TEXT NOT NULL,SALT TEXT NOT NULL)");
 	mysql_close(con); 
 	return;
 } /* init_DB */
@@ -214,6 +214,11 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         bind[2].buffer_length=sizeof(int);
         bind[2].is_null=0;
         bind[2].length=0;
+//        bind[3].buffer_type=MYSQL_TYPE_STRING;
+//        bind[3].buffer=authkey;
+//        bind[3].buffer_length=strlen(authkey);
+//        bind[3].is_null=0;
+//        bind[3].length=0;
 	bind[3].buffer_type=MYSQL_TYPE_STRING;
 	bind[3].buffer=hash->hash;
 	bind[3].buffer_length=hash->hashl;
@@ -601,7 +606,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
                 mysql_close(db);
                 exit(1);
         }
-        char* statement = "SELECT AUTHKEY,SALT FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
+        char* statement = "SELECT SHA256,SALT FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
                 fprintf(stderr,"Error: mysql_stmt_prepare() error (%s) -> getUserAuthKey\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);

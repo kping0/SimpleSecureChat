@@ -27,9 +27,9 @@ elif [ "$1" == "stop" ] || [ "$1" == "STOP" ];then
 	echo "Stopping Server"
 	pkill SSCServer	
 elif [ "$1" == "log" ]; then
-	echo "Showing log, Ctrl-C to exit"
+	echo "Showing last 50 lines of log, Ctrl-C to exit"
 	sleep 2
-	watch -n 0.5 cat SSCServer.log 
+	watch -n 0.5 tail -n 50 SSCServer.log 
 else
 	echo "Usage: server_ctl.sh [START|STOP]"
 fi

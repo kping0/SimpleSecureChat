@@ -42,4 +42,23 @@
 #define SSCS_KEYFILE "key.pem" //Key file
 #define SSCS_KEYFILE_PW "test" //key file password
 
+/* 
+ * Use Custom Malloc or system specific malloc & free
+ * NOTE: The custom malloc has a HUGE ~4KB overhead per allocation due to a Guard Page protecting 
+ * against Heap Overflows
+ *
+ * Better-performance -> Use Default Malloc 
+ * Security -> Use Custom Malloc
+ */
+
+//#define SSCS_CUSTOM_MALLOC /* comment out to use the system specific malloc & free */
+
+#ifdef SSCS_CUSTOM_MALLOC
+	#include "protected_malloc.h"
+#else
+	#define cmalloc(size) calloc(1,size) 
+	#define cfree(ptr) free(ptr) 
+	#define cmalloc_init() puts("") 
 #endif
+
+#endif /* SSC_SETTINGSHFSRV */

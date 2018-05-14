@@ -34,7 +34,7 @@ unsigned char * mitbase64_encode(const unsigned char *src, size_t len,
 	olen++; /* nul termination */
 	if (olen < len)
 		return NULL; /* integer overflow */
-	out = malloc(olen); if (out == NULL) return NULL;
+	out = cmalloc(olen); if (out == NULL) return NULL;
 
 	end = src + len;
 	in = src;
@@ -101,7 +101,7 @@ unsigned char * mitbase64_decode(const unsigned char *src, size_t len,
 		return NULL;
 
 	olen = count / 4 * 3;
-	pos = out = malloc(olen);
+	pos = out = cmalloc(olen);
 	if (out == NULL)
 		return NULL;
 
@@ -127,7 +127,7 @@ unsigned char * mitbase64_decode(const unsigned char *src, size_t len,
 					pos -= 2;
 				else {
 					/* Invalid padding */
-					free(out);
+					cfree(out);
 					return NULL;
 				}
 				break;

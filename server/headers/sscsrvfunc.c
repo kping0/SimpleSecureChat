@@ -20,12 +20,12 @@
 #include "sscsrvfunc.h"
 
 void pexit(char* errormsg){
-	fprintf(stderr,"Error: %s\n",errormsg);
+	fprintf(stderr,"[ERROR] %s\n",errormsg);
 	exit(1);
 } /* pexit */
 
 void exit_mysql_err(MYSQL* con){ //print exit message and exit
-	fprintf(stderr,"Error: %s\n",mysql_error(con));
+	fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
 	mysql_close(con);
 	exit(1);	
 } /* exit_mysql_err */
@@ -42,12 +42,12 @@ void init_DB(void){ //prepare database
 #endif /* DEBUG */
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
-		fprintf(stderr,"Error: %s\n",mysql_error(con));
+		fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
 		exit(1);
 	}
 	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,NULL,0,NULL,0))exit_mysql_err(con);
 	if(mysql_query(con,"use SSCServerDB")){
-		fprintf(stderr,"Error: ? Server DB not found, First Time Run? -> Trying to Create Database\n");
+		fprintf(stderr,"[ERROR] ? Server DB not found, First Time Run? -> Trying to Create Database\n");
 		if(mysql_query(con,"CREATE DATABASE SSCServerDB"))exit_mysql_err(con);
 		if(mysql_query(con,"use SSCServerDB"))exit_mysql_err(con);
 		
@@ -62,7 +62,7 @@ void init_DB(void){ //prepare database
 MYSQL* get_handle_DB(void){ //return active handle to database
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
-		fprintf(stderr,"Error: %s\n",mysql_error(con));
+		fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
 		exit(1);
 	}
 	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,"SSCServerDB",0,NULL,0))exit_mysql_err(con);
@@ -79,18 +79,18 @@ int create_socket(int port){ //bind socket s to port and return socket s
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
-	fprintf(stderr,"Error: Unable to create socket\n");
+	fprintf(stderr,"[ERROR] Unable to create socket\n");
 	exit(EXIT_FAILURE);
     }
     int enable = 1;
     setsockopt(s,SOL_SOCKET,SO_REUSEADDR,&enable,sizeof(int));
     if (bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-	fprintf(stderr,"Error: Unable to bind, is server already running?\n");
+	fprintf(stderr,"[ERROR] Unable to bind, is server already running?\n");
 	exit(EXIT_FAILURE);
     }
 
     if (listen(s, 1) < 0) {
-	fprintf(stderr,"Error: Unable to listen\n");
+	fprintf(stderr,"[ERROR] Unable to listen\n");
 	exit(EXIT_FAILURE);
     }
     #ifdef SSC_VERIFY_VARIABLES
@@ -116,7 +116,7 @@ SSL_CTX *create_context(){
 
     ctx = SSL_CTX_new(method);
     if (!ctx) {
-	fprintf(stderr,"Error: Unable to create SSL context\n");
+	fprintf(stderr,"[ERROR] Unable to create SSL context\n");
 	ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
@@ -144,7 +144,7 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 	if(!stmt)return 1; //make sure user is not added if an error occurs
 	char* statement = "SELECT UID FROM KNOWNUSERS WHERE username=?";
 	if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-		fprintf(stderr,"Error: stmt prepare failed (%s)\n",mysql_stmt_error(stmt));
+		fprintf(stderr,"[ERROR] stmt prepare failed (%s)\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 		exit(1);
@@ -157,13 +157,13 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 	bind[0].is_null=0;
 	bind[0].length=0;
 	if(mysql_stmt_bind_param(stmt,bind)){
-		fprintf(stderr,"Error: stmt bind param failed (%s)\n",mysql_stmt_error(stmt));
+		fprintf(stderr,"[ERROR] stmt bind param failed (%s)\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 		exit(1);
 	}
 	if(mysql_stmt_execute(stmt)){
-		fprintf(stderr,"Error: stmt exec failed int checkforUser(): %s\n",mysql_stmt_error(stmt));
+		fprintf(stderr,"[ERROR] stmt exec failed int checkforUser(): %s\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 		exit(1);
@@ -185,13 +185,13 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 	
 	MYSQL_STMT* stmt = mysql_stmt_init(db);
 	if(!stmt){
-                fprintf(stderr,"Error: Failed to initialize stmt -> addUser2DB\n");
+                fprintf(stderr,"[ERROR] Failed to initialize stmt -> addUser2DB\n");
                 mysql_close(db);
                 exit(1);
         }
       char* statement = "INSERT INTO KNOWNUSERS VALUES(NULL,?,?,?,?,?)";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: stmt prepare failed (%s) -> addUser2DB \n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] stmt prepare failed (%s) -> addUser2DB \n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -214,11 +214,6 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         bind[2].buffer_length=sizeof(int);
         bind[2].is_null=0;
         bind[2].length=0;
-//        bind[3].buffer_type=MYSQL_TYPE_STRING;
-//        bind[3].buffer=authkey;
-//        bind[3].buffer_length=strlen(authkey);
-//        bind[3].is_null=0;
-//        bind[3].length=0;
 	bind[3].buffer_type=MYSQL_TYPE_STRING;
 	bind[3].buffer=hash->hash;
 	bind[3].buffer_length=hash->hashl;
@@ -226,14 +221,14 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 	bind[4].buffer=hash->salt;
 	bind[4].buffer_length=hash->saltl;
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: binding stmt param (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] binding stmt param (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: stmt exec failed (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] stmt exec failed (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -270,13 +265,13 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         MYSQL_STMT* stmt;
         stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"Error: mysql_stmt_init out of mem ->getUserUID\n");
+                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->getUserUID\n");
                 mysql_close(db);
                 exit(1);
         }
         char* statement = "SELECT UID FROM KNOWNUSERS WHERE USERNAME = ?";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: mysql_stmt_prepare() error (%s) -> getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -288,7 +283,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param err (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -300,28 +295,28 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         result[0].buffer=&usruid;
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_execute err (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"Error: mysql_stmt_bind_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_store_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_fetch(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_fetch() error / maybe user is not in db (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_fetch() error / maybe user is not in db (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return -1;
         }
@@ -335,13 +330,13 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
 int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"Error: mysql_stmt_init out of mem->addMsg2DB\n");
+                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem->addMsg2DB\n");
                 mysql_close(db);
                 exit(1);
         }
         char* statement = "INSERT INTO MESSAGES VALUES(NULL,?,?)";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: mysql_stmt_prepare err (%s)->addMsg2DB\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare err (%s)->addMsg2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -357,14 +352,14 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
         bind[1].buffer=message;
         bind[1].buffer_length=(size_t)strlen((const char*)message);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param err (%s)->AddMSG2DB\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->AddMSG2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
         //printf("Username %s , %i with msg %s\n",recipient,recvuid,message);
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_execute() err (%s)->addMSG2DB\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_execute() err (%s)->addMSG2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -382,13 +377,13 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         if( newline ) *newline = 0;
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"Error: mysql_stmt_init out of mem ->GetEncodedRSA\n");
+                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->GetEncodedRSA\n");
                 mysql_close(db);
                 exit(1);
         }
         char* statement = "SELECT RSAPUB64,RSALEN FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: mysql_stmt_prepare() error (%s) -> GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -399,7 +394,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -416,33 +411,33 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         result[1].buffer=&rsalen;
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_execute err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"Error: mysql_stmt_bind_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_store_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
         int mysql_fetch_rv = mysql_stmt_fetch(stmt);
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"Error: mysql_stmt_fetch err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
         if(rsapub64_len > 0){
-                rsapub64 = malloc(rsapub64_len); //allocate buffer for string
+                rsapub64 = cmalloc(rsapub64_len); //allocate buffer for string
                 memset(result,0,sizeof(result)); //reset result so that rsalen does not get reset
                 result[0].buffer=rsapub64;
                 result[0].buffer_length=rsapub64_len;
@@ -451,7 +446,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         else{
                 mysql_stmt_close(stmt);
 #ifdef DEBUG
-               fprintf(stderr,"Error: rsapub64_len <= 0,maybe user \"%s\" does not exist?->GetEncodedRSA\n",username);
+               fprintf(stderr,"[ERROR] rsapub64_len <= 0,maybe user \"%s\" does not exist?->GetEncodedRSA\n",username);
 #endif /* DEBUG */
                 return NULL;
         }
@@ -466,7 +461,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         const char* retptr = SSCS_object_encoded(obj);
 //cleanup
         SSCS_release(&obj);
-        free(rsapub64);
+        cfree(rsapub64);
         mysql_stmt_close(stmt);
         return retptr;
 } /* GetEncodedRSA */
@@ -475,13 +470,13 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         int usruid = getUserUID(username,db);
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"Error: mysql_stmt_init out of mem ->GetUserMessagesSRV\n");
+                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->GetUserMessagesSRV\n");
                 mysql_close(db);
                 exit(1);
         }
         char* statement = "SELECT MESSAGE FROM MESSAGES WHERE RECVUID = ?";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: mysql_stmt_prepare err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -492,13 +487,13 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         bind[0].buffer=&usruid;
         bind[0].buffer_length=sizeof(int);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_execute err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -509,13 +504,13 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         result[0].buffer_type=MYSQL_TYPE_STRING;
         result[0].length=&msglength;
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"Error: mysql_stmt_bind_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_store_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -532,12 +527,12 @@ while(1){
         }
 
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"Error: mysql_stmt_fetch err (%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
         if(msglength > 0){
-                msgbuf = malloc(msglength); //allocate buffer for string
+                msgbuf = cmalloc(msglength); //allocate buffer for string
                 memset(result,0,sizeof(result)); //reset result so that rsalen does not get reset
                 result[0].buffer=msgbuf;
                 result[0].buffer_length = msglength;
@@ -548,7 +543,7 @@ while(1){
                 break;
         }
         SSCS_list_add_data(list,(byte*)msgbuf,msglength);
-        free(msgbuf);
+        cfree(msgbuf);
         msgbuf = NULL;
 }
         char* retptr = SSCS_list_encoded(list);
@@ -560,7 +555,7 @@ while(1){
         MYSQL_STMT *stmt2 = mysql_stmt_init(db);
         char* statement2 = "DELETE FROM MESSAGES WHERE RECVUID = ?";
         if(mysql_stmt_prepare(stmt2,statement2,strlen(statement2))){
-                fprintf(stderr,"Error: mysql_stmt_prepare2 err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare2 err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
                 exit(1);
@@ -571,21 +566,20 @@ while(1){
         bind2[0].buffer=&usruid;
         bind2[0].buffer_length=sizeof(int);
         if(mysql_stmt_bind_param(stmt2,bind2)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
-                free(retptr);
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                cfree(retptr);
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
                 exit(1);
         }
         if(mysql_stmt_execute(stmt2)){
-                fprintf(stderr,"Error: mysql_stmt_execute2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
-                free(retptr);
+                fprintf(stderr,"[ERROR] mysql_stmt_execute2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                cfree(retptr);
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
                 exit(1);
         }
         mysql_stmt_close(stmt2);
-
         return retptr;
 } /* GetUserMessagesSRV */
 
@@ -602,13 +596,13 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         if( newline ) *newline = 0;
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"Error: mysql_stmt_init out of mem ->getUserAuthKey\n");
+                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->getUserAuthKeyHash\n");
                 mysql_close(db);
                 exit(1);
         }
         char* statement = "SELECT SHA256,SALT FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"Error: mysql_stmt_prepare() error (%s) -> getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -619,7 +613,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"Error: mysql_stmt_bind_param err (%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
@@ -636,33 +630,33 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
 	result[1].buffer_type=MYSQL_TYPE_STRING;
 	result[1].length=&salt_len;
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_execute err (%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"Error: mysql_stmt_bind_result() err(%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"Error: mysql_stmt_store_result() err(%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 exit(1);
         }
         int mysql_fetch_rv = mysql_stmt_fetch(stmt);
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"Error: mysql_stmt_fetch err (%s)->getUserAuthKey\n",mysql_stmt_error(stmt));
+                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
-        authkey = malloc(authkey_len); //allocate buffer for string
-	salt = malloc(salt_len);
+        authkey = cmalloc(authkey_len); //allocate buffer for string
+	salt = cmalloc(salt_len);
         memset(result,0,sizeof(result)); //reset result 
         result[0].buffer_type=MYSQL_TYPE_STRING;
         result[0].buffer=authkey;
@@ -674,7 +668,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
 	result[0].buffer_length=salt_len;	
 	mysql_stmt_fetch_column(stmt,result,1,0); //get string
         mysql_stmt_close(stmt);
-	SSCS_HASH* retstruct = malloc(sizeof(SSCS_HASH));
+	SSCS_HASH* retstruct = cmalloc(sizeof(SSCS_HASH));
 	retstruct->hash=(byte*)authkey;	
 	retstruct->hashl=authkey_len;
 	retstruct->salt=(byte*)salt;

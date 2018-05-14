@@ -20,7 +20,7 @@
 #include "hashing.h"
 
 byte* memncat(byte* first,size_t firstl,byte* second,size_t secondl){ //concatenates two blocks of memory 
-	byte* finalbuffer = malloc(firstl+secondl);
+	byte* finalbuffer = cmalloc(firstl+secondl);
 	byte* writepointer = finalbuffer;
 	memcpy(writepointer,first,firstl);
 	writepointer+=firstl;
@@ -44,12 +44,12 @@ SSCS_HASH* SSCS_createhash(byte* data,size_t datal){
 	size_t b64hashl = 0;
 	byte* b64hash = mitbase64_encode(hash,SHA512_DIGEST_LENGTH,&b64hashl);
 
-	SSCS_HASH* retstruct = malloc(sizeof(SSCS_HASH));
+	SSCS_HASH* retstruct = cmalloc(sizeof(SSCS_HASH));
 	retstruct->hash = b64hash;
 	retstruct->hashl = b64hashl;
 	retstruct->salt = b64salt;
 	retstruct->saltl = b64saltl;
-	free(salt_and_data);
+	cfree(salt_and_data);
 	return retstruct;
 }
 
@@ -65,21 +65,21 @@ int SSCS_comparehash(byte* data,size_t datal,SSCS_HASH* originalhash){
 	size_t b64data_hash_len = 0;
 	byte* b64data_hash = mitbase64_encode(data_hash,SHA512_DIGEST_LENGTH,&b64data_hash_len);
 	if(b64data_hash_len != hashl){
-		free(salt_and_data);
-		free(b64data_hash);
+		cfree(salt_and_data);
+		cfree(b64data_hash);
 		return SSCS_HASH_INVALID;
 	}
 	int result = memcmp(hash,b64data_hash,SHA512_DIGEST_LENGTH);
-	free(salt_and_data);
-	free(b64data_hash);
+	cfree(salt_and_data);
+	cfree(b64data_hash);
 	if(result==0)return SSCS_HASH_VALID;
 	return SSCS_HASH_INVALID;
 }
 
 void SSCS_freehash(SSCS_HASH** hash){
-	free(((*hash)->hash));
-	free(((*hash)->salt));
-	free((*hash));
+	cfree(((*hash)->hash));
+	cfree(((*hash)->salt));
+	cfree((*hash));
 	*hash = NULL;
 }
 

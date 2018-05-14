@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "settings.h"
 /*
 * Names changed from base64_encode & base64_decode to mitbase64_encode & mitbase64_decode because conflict with mysql client library function
 */

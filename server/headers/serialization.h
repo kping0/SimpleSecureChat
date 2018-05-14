@@ -1,6 +1,8 @@
 #ifndef SSCS_SERIALIZATION
 #define SSCS_SERIALIZATION
 
+#include "settings.h"
+
 struct SSCS_struct{ //SSCS_object
 	void* buf_ptr; //Pointer to current buffer
 	size_t allocated; //Size of current buffer (allocated amount)

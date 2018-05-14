@@ -26,6 +26,7 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include "base64.h"
+#include "settings.h"
 
 #define SSCS_HASH_VALID 1
 #define SSCS_HASH_INVALID 2

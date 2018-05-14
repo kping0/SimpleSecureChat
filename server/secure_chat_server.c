@@ -41,29 +41,30 @@
 
 #include "headers/sscsrvfunc.h" //Some SSL functions 
 #include "headers/settings.h" //settings for ssc
+#include "headers/protected_malloc.h"
 #include "headers/base64.h" //MIT base64 function (BSD LICENSE)
 #include "headers/serialization.h" //SSCS Library
 #include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
 int sock = 0; //Global listen variable so it can be closed from a signal handler
 
 int main(void){
+
 #ifdef SSCS_LOGTOFILE
     FILE* stdoutl = freopen(SSCS_LOGFILE,"a+",stdout);
     FILE* stderrl = freopen(SSCS_LOGFILE,"a+",stderr); 
 #endif /* SSCS_LOGTOFILE */
-
     //register signal handlers..
     signal(SIGINT,ssc_sig_handler);
     signal(SIGABRT,ssc_sig_handler);
     signal(SIGFPE,ssc_sig_handler);
     signal(SIGILL,ssc_sig_handler);
-    signal(SIGSEGV,ssc_sig_handler);
+    signal(SIGSEGV,SIG_DFL);
     signal(SIGTERM,ssc_sig_handler);
     signal(SIGCHLD,childexit_handler);
     //Init MYSQL Database
     init_DB();
 	
-    SSL_CTX *ctx;
+    SSL_CTX *ctx = NULL;
 
     //initalize openssl and create the ssl_ctx context
     init_openssl();
@@ -87,6 +88,7 @@ int main(void){
 	pid_t pid = fork();
 	if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 
 		signal(SIGINT,SIG_DFL); //unbind sigint for segfault
+		cmalloc_init();	
 		if (client < 0) {
 		    perror("Unable to accept");
 		    exit(EXIT_FAILURE);
@@ -103,7 +105,7 @@ int main(void){
 		#ifdef SSC_VERIFY_VARIABLES
 		assert(ssl != NULL);
 		#endif
-		char* buf = malloc(4096); //Main receive buffer for receiving from SSL socket
+		char* buf = cmalloc(4096); //Main receive buffer for receiving from SSL socket
 		MYSQL* db = get_handle_DB();
 		while(1){ //Handle request until interrupt or connection problems	
 			memset(buf,'\0',4096);
@@ -125,14 +127,14 @@ int main(void){
 			if(msgp0 == REGRSA){ //User wants to register a username with a public key
 				char* rusername = (char*)SSCS_object_string(obj0,"rusername");
 				if(!rusername){
-					fprintf(stderr,"Error: User wants to register but username not found in serialized object\n");
+					fprintf(stderr,"[ERROR] User wants to register but username not found in serialized object\n");
 					goto end;
 				}
 				char* newline = strchr(rusername,'\n');
 				if( newline ) *newline = 0;
 	
 				if(checkforUser(rusername,db) == 1){
-					fprintf(stderr,"Error: Cannot add user \"%s\"-> username already taken.\n",rusername);
+					fprintf(stderr,"[ERROR] Cannot add user \"%s\"-> username already taken.\n",rusername);
 					SSL_write(ssl,"ERR",3);
 				}
 				else{
@@ -144,7 +146,7 @@ int main(void){
 					char* authkey = (char*)SSCS_object_string(obj0,"authkey");
 					if(strlen(authkey) < 256) goto end;
 					if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
-						fprintf(stderr,"Error: inserting user %s\n",rusername);
+						fprintf(stderr,"[ERROR] inserting user %s\n",rusername);
 						SSL_write(ssl,"ERR",3);
 						goto end;
 					}
@@ -153,7 +155,7 @@ int main(void){
 						fprintf(stdout,"Update: User \"%s\" registered\n",rusername);	
 	#endif
 						SSL_write(ssl,"OK",2);
-						free(rusername);
+						cfree(rusername);
 					}
 				}
 			}
@@ -163,13 +165,13 @@ int main(void){
 	#endif
 				char* userauthk = (char*)SSCS_object_string(obj0,"authkey");
 				if(strlen(userauthk) < 256){
-					fprintf(stderr,"Error: Authkey supplied <256 (%i)\n",(int)strlen(userauthk));
+					fprintf(stderr,"[ERROR] Authkey supplied <256 (%i)\n",(int)strlen(userauthk));
 					goto end;
 				}
 				char* authusername = (char*)SSCS_object_string(obj0,"username");
 				SSCS_HASH* hash = getUserAuthKeyHash(authusername,db);
 				if(!hash){
-					fprintf(stderr,"Error: Authkey returned by getUserAuthKey is NULL, exiting\n");
+					fprintf(stderr,"[ERROR] Authkey returned by getUserAuthKey is NULL, exiting\n");
 					goto end;
 				}
 				if(SSCS_comparehash((byte*)userauthk,strlen(userauthk),hash) == SSCS_HASH_VALID){
@@ -209,9 +211,9 @@ int main(void){
 	#endif /* DEBUG */
 							if(uRSAenc){
 								SSL_write(ssl,uRSAenc,strlen(uRSAenc));	
-								free((void*)uRSAenc);
+								cfree((void*)uRSAenc);
 							}
-							free(rsausername);
+							cfree(rsausername);
 						}
 						else if(msgp == MSGREC){ //Client is requesting stored messages
 	#ifdef DEBUG
@@ -219,6 +221,7 @@ int main(void){
 	#endif /* DEBUG */
 							char* retmsg = GetUserMessagesSRV(authusername,db);
 	#ifdef DEBUG
+							fprintf(stdout,"Update: msg is %s\n",retmsg);
 							fprintf(stdout,"Update: Length of messages returned is %d\n",(int)strlen(retmsg));
 	#endif /* DEBUG */
 							if(strlen(retmsg) != 0){ 
@@ -233,7 +236,7 @@ int main(void){
 							char* recipient = NULL;
 							recipient = (char*)SSCS_object_string(obj,"recipient");
 							if(!recipient){
-							fprintf(stderr,"Error: Recipient for message not specified,exiting\n");
+							fprintf(stderr,"[ERROR] Recipient for message not specified,exiting\n");
 							goto end;
 							}
 							if(SSCS_object_string(obj,"sender") != NULL)goto end;
@@ -245,7 +248,7 @@ int main(void){
 							fprintf(stdout,"Update: buffering message from %s to %s\n",authusername,recipient);
 	#endif /* DEBUG */
 							if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
-								fprintf(stderr,"Error: Error occurred adding MSG to Database\n");
+								fprintf(stderr,"[ERROR] Error occurred adding MSG to Database\n");
 							}				
 						}
 						SSCS_release(&obj);
@@ -262,7 +265,7 @@ int main(void){
 			}
 			else{
 				puts("Message received with no specific purpose");
-				fprintf(stderr,"Error: ? Message received with no specific purpose, exiting...\n");
+				fprintf(stderr,"[ERROR] ? Message received with no specific purpose, exiting...\n");
 				SSCS_release(&obj0);
 				goto end;
 			}
@@ -279,7 +282,7 @@ int main(void){
 		BIO_free(bio);
 		SSL_free(ssl);
 		close(client); 
-		free(buf); 
+		cfree(buf); 
 		exit(0);
 	} 
 	/*

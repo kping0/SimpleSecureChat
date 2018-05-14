@@ -47,7 +47,6 @@
 #define HOST_PORT "5050"
 #define HOST_CERT "public.pem"
 */
-
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
 #define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)

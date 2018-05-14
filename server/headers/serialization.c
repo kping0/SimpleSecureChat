@@ -6,6 +6,8 @@
 
 #include "base64.h" 
 #include "serialization.h" 
+#include "settings.h"
+
 /*
  * SimpleSecureChat Serialization Library. Made with Security in mind.
 */
@@ -28,13 +30,13 @@ byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){
 	return NULL;
 }
 sscso *SSCS_object(void){
-	sscso* obj = calloc(1,sizeof(struct SSCS_struct));		
+	sscso* obj = cmalloc(sizeof(struct SSCS_struct));		
 	obj->buf_ptr = NULL; 
 	obj->allocated = 0;
 	return obj;
 }
 sscsl *SSCS_list(void){
-	sscsl* list = calloc(1,sizeof(struct SSCS_list));
+	sscsl* list = cmalloc(sizeof(struct SSCS_list));
 	list->buf_ptr = NULL;
 	list->allocated = 0;
 	list->items = 0;
@@ -43,9 +45,9 @@ sscsl *SSCS_list(void){
 }
 sscsl *SSCS_list_open(byte* buf){
 	size_t len = strlen((const char*)buf);
-	void* buf_ptr = calloc(1,len);
+	void* buf_ptr = cmalloc(len);
 	memcpy(buf_ptr,buf,len);
-	sscsl *list = calloc(1,sizeof(struct SSCS_list));
+	sscsl *list = cmalloc(sizeof(struct SSCS_list));
 	list->buf_ptr = buf_ptr;
 	list->allocated = len;
 	return list;
@@ -53,9 +55,9 @@ sscsl *SSCS_list_open(byte* buf){
 
 sscso *SSCS_open(byte* buf){
 	size_t len = strlen((const char*)buf);
-	void* buf_ptr = calloc(1,len);
+	void* buf_ptr = cmalloc(len);
 	memcpy(buf_ptr,buf,len);
-	sscso* obj = calloc(1,sizeof(struct SSCS_struct));
+	sscso* obj = cmalloc(sizeof(struct SSCS_struct));
 	obj->buf_ptr = buf_ptr;
 	obj->allocated = len;
 	return obj;
@@ -73,7 +75,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	sprintf(label,"%zd:\"",old_buf_items+1);
 	int label_len = strlen((const char*)label);
 	size_t final_intermediate_len = b64datalen+label_len+2;
-	byte* intermediatebuf = calloc(1,final_intermediate_len);
+	byte* intermediatebuf = cmalloc(final_intermediate_len);
 	memset(intermediatebuf,0,final_intermediate_len);
 	byte* ibufwloc = intermediatebuf; //ibufwloc is a pointer to the next area to write to
 	int i = 0;
@@ -88,12 +90,12 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	ibufwloc++;
 	*ibufwloc = ';';
 	ibufwloc++;
-	free(b64data);	
+	cfree(b64data);	
 	size_t new_buf_size = (old_buf_size + final_intermediate_len);
-	void *new_buf_ptr = calloc(1,new_buf_size);
+	void *new_buf_ptr = cmalloc(new_buf_size);
 	memset(new_buf_ptr,0,new_buf_size);
 	if(old_buf_ptr != NULL)memcpy(new_buf_ptr,old_buf_ptr,old_buf_size);
-	free(old_buf_ptr);
+	cfree(old_buf_ptr);
 	old_buf_ptr = NULL;
 	i = 0;
 	byte* base_ptr = new_buf_ptr + old_buf_size ;	
@@ -105,7 +107,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	list->allocated = new_buf_size;
 	list->buf_ptr = new_buf_ptr;
 	list->items = old_buf_items+1;
-	free(intermediatebuf);
+	cfree(intermediatebuf);
 	return 0;
 }
 int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
@@ -114,7 +116,7 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	size_t old_buf_size = obj->allocated;	
 	int label_len = (int)strlen((const char*)label);
 	int modlabel_len = label_len+2;
-	char* modlabel = calloc(1,modlabel_len+1); //+1 for the NUL 
+	char* modlabel = cmalloc(modlabel_len+1); //+1 for the NUL 
 	sprintf(modlabel,"%s:\"",label);
 	size_t encoded_size;
 	if(old_buf_ptr != NULL){
@@ -128,7 +130,7 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
 	size_t final_intermediate_len = b64datalen+modlabel_len+2; //+2 for the ' "; ' at the end
-	byte* intermediatebuf = calloc(1,final_intermediate_len);
+	byte* intermediatebuf = cmalloc(final_intermediate_len);
 	byte* ibufwloc = intermediatebuf; //ibufwloc is a pointer to the next area to write to
 	size_t i = 0;
 	while(i < strlen(modlabel)){
@@ -142,12 +144,12 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	ibufwloc++;
 	*ibufwloc = ';';
 	ibufwloc++;
-	free(b64data);	
+	cfree(b64data);	
 	size_t new_buf_size = (old_buf_size + final_intermediate_len);
-	void *new_buf_ptr = calloc(1,new_buf_size);
+	void *new_buf_ptr = cmalloc(new_buf_size);
 	memset(new_buf_ptr,0,new_buf_size);
 	if(old_buf_ptr != NULL)memcpy(new_buf_ptr,old_buf_ptr,old_buf_size);
-	free(old_buf_ptr);
+	cfree(old_buf_ptr);
 	old_buf_ptr = NULL;
 	i = 0;
 	byte* base_ptr = new_buf_ptr + old_buf_size ;	
@@ -158,8 +160,8 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	}
 	obj->allocated = new_buf_size;
 	obj->buf_ptr = new_buf_ptr;
-	free(intermediatebuf);
-	free(modlabel);
+	cfree(intermediatebuf);
+	cfree(modlabel);
 	return 0;
 }
 sscsd* SSCS_object_data(sscso* obj,char* label){
@@ -178,30 +180,30 @@ sscsd* SSCS_object_data(sscso* obj,char* label){
 		i++;	
 	}
 	double b64encoded_len = i; 
-	byte* b64buffer = calloc(1,b64encoded_len+1); 
+	byte* b64buffer = cmalloc(b64encoded_len+1); 
 	i = 0;
 	/* Run loop again to read encoded string */
 	while(readpointer[i] != '"' && readpointer[i+1] != ';'){ //Get base64encoded data 
 		if(!((size_t)((readpointer+i) - buf_ptr) < allocated) || b64encoded_len < i){
 			//puts("Outsize of memory bounds");
-			free(b64buffer);
+			cfree(b64buffer);
 			return NULL;
 		}
 		*(b64buffer+i) = *(readpointer+i);	
 		i++;
 	}
 	size_t len; 
-	sscsd* final = calloc(1,sizeof(sscsd));
+	sscsd* final = cmalloc(sizeof(sscsd));
 	final->data = mitbase64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
-	free(b64buffer);
+	cfree(b64buffer);
 	return final;
 }
 sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after every run.
 	if(index > 4096)return NULL; //support a max of 4096 items
 	byte* buf_ptr = list->buf_ptr;
 	size_t allocated = list->allocated;
-	char* label = calloc(1,30);
+	char* label = cmalloc(30);
 	sprintf(label,"%d:\"",index);
 	size_t label_len = strlen((const char*)label);
 	int i = 0;
@@ -221,28 +223,28 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 		i++;	
 	}
 	double b64encoded_len = i; 
-	byte* b64buffer = calloc(1,b64encoded_len+1); 
+	byte* b64buffer = cmalloc(b64encoded_len+1); 
 	i = 0;
 	/* Run loop again to read encoded string */
 	while(readpointer[i] != '"' && readpointer[i+1] != ';'){ //Get base64encoded data 
 		if(!((size_t)((readpointer+i) - buf_ptr) < allocated) || b64encoded_len < i){
 			//puts("Outsize of memory bounds");
-			free(b64buffer);
+			cfree(b64buffer);
 			return NULL;
 		}
 		*(b64buffer+i) = *(readpointer+i);	
 		i++;
 	}
 	size_t len; 
-	sscsd* final = calloc(1,sizeof(sscsd));
+	sscsd* final = cmalloc(sizeof(sscsd));
 	final->data = mitbase64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
-	free(b64buffer);
-	free(label);
+	cfree(b64buffer);
+	cfree(label);
 	return final;
 }
 char* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
-	char* retptr = calloc(1,obj->allocated+2);
+	char* retptr = cmalloc(obj->allocated+2);
 	memcpy(retptr,obj->buf_ptr,obj->allocated);
 	*(retptr+obj->allocated+1) = '\0';	
 	return retptr;
@@ -252,7 +254,7 @@ size_t SSCS_object_encoded_size(sscso* obj){ //Get size of string(often needs to
 	return obj->allocated;	
 } 
 char* SSCS_list_encoded(sscsl* list){
-	char* retptr = calloc(1,list->allocated+1);
+	char* retptr = cmalloc(list->allocated+1);
 	memcpy(retptr,list->buf_ptr,list->allocated);
 	*(retptr+list->allocated) = '\0';
 	return retptr;
@@ -270,27 +272,27 @@ size_t SSCS_data_get_size(sscsd* data){
 }
 /* UNUSED because all functions allocated a new sscso object and dont reuse 
 void SSCS_free(sscso* obj){ //Frees current buffer associated with sscso obj (Object Can be Reused)
-	free(obj->buf_ptr);
+	cfree(obj->buf_ptr);
 	obj->buf_ptr = NULL;
 	obj->allocated = 0;
 }
 */
 
 void SSCS_release(sscso** obj){ //Frees the current buffer AND the structure holding the address to the buffer; (Object Cant be Reused)
-	free(((*obj)->buf_ptr));
-	free(*obj);
+	cfree(((*obj)->buf_ptr));
+	cfree(*obj);
 	*obj = NULL;
 }
 void SSCS_data_release(sscsd** data){ //Frees the data buffer AND the structure holding the address and the length
 	if(*data == NULL)return;
-	free(((*data)->data));
-	free(*data);
+	cfree(((*data)->data));
+	cfree(*data);
 	*data = NULL;	
 }
 void SSCS_list_release(sscsl** list){
 	if(*list == NULL)return;
-	free(((*list)->buf_ptr));
-	free(*list);
+	if((*list)->buf_ptr != NULL)cfree(((*list)->buf_ptr));
+	cfree(*list);
 	*list = NULL;
 }
 /*
@@ -323,7 +325,7 @@ double SSCS_object_double(sscso* obj,char* label){
 unsigned char* SSCS_object_string(sscso* obj,char* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return NULL;
-	unsigned char* ret_ptr = calloc(1,data->len+2);
+	unsigned char* ret_ptr = cmalloc(data->len+2);
 	memcpy(ret_ptr,data->data,data->len);
 	*(ret_ptr+data->len + 1) = '\0';
 	SSCS_data_release(&data);

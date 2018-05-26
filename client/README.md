@@ -1,13 +1,18 @@
 <h2>Client</h2>
 Dependencies:
 
-    OpenSSL (sudo yum install openssl-devel || sudo apt-get install libopenssl-dev)
-    SQLite 3 (DB Library) (sudo apt-get install libsqlite3-dev)
-    Gtk+ 3.2 (Only if compiled with GUI)
+    OpenSSL Development files
+    SQLite 3 Development files
+    Gtk+ 3.2 Development files (not necessary for the cli only version)
+    NCurses Development files 
 
-To compile the client install "make" and run:
+To compile the gui+cli client, install "make" and run:
 
-    make gui #(Run inside of the client directory)
+    make 
+   
+To compile the cli version only, install "make" and run:
+
+    make cli
 
 To reset your instance of SimpleSecureChat-Client:
 

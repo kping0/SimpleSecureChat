@@ -1,3 +1,4 @@
+
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -37,49 +38,51 @@
 #include <openssl/pem.h>
 #include <sqlite3.h> 
 
-//Custom function headers
+//Custom headers
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
 #include "headers/sscdbfunc.h" //DB manipulation functions 
 #include "headers/base64.h" //Base64 Functions
 #include "headers/serialization.h" //SimpleSecureSerialization library (to replace binn)
 #include "headers/msgfunc.h" //encrypt-decrypt-verify-sign functions
-//All configurable settings
 #include "headers/settings.h" //Modify to change configuration of SSC
+#include "headers/cli.h" //Cli 
 
 #ifdef SSC_GUI
 #include <gtk/gtk.h>
 #include "headers/gui.h"
-#endif /* SSC_GUI */
 
-#define UNUSED(x)((void)x)
-typedef unsigned char byte; //Create type "byte" NOTE: only when the build system version of type "char" is 8bit
-
-int pexit(char* error){
-	fprintf(stdout,"Exiting, error : %s\n",error);
-	exit(1);
-}
-#ifdef SSC_GUI
 gboolean timedupdate_gui(void* data){
 	clear_messages_gui(data);	
 	getmessages_gui(data);
 	return 1;
 }
+
 #endif /* SSC_GUI */
+
+#define UNUSED(x)((void)x)
+
+typedef unsigned char byte;
+
+int pexit(char* error){
+	fprintf(stdout,"[ERROR] Exiting, error : %s\n",error);
+	exit(1);
+}
+
 //Startpoint
 int main(void){
-	puts("Starting secure chat application...");
-	puts("Get the source at: ('https://github.com/kping0/simplesecurechat/client')");
-	puts("Host your own server with ('https://github.com/kping0/simplesecurechat/server')");
+	fprintf(stdout,"[INFO] Starting secure chat application...\n");
+	fprintf(stdout,"[INFO] Get the source at: ('https://github.com/kping0/simplesecurechat/client')\n");
+	fprintf(stdout,"[INFO] Host your own server with ('https://github.com/kping0/simplesecurechat/server')\n");
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
-		puts("SSL/TLS OK");
-		puts("Connected to " HOST_NAME ":" HOST_PORT " using server-cert: " HOST_CERT);
+		fprintf(stdout,"[INFO] SSL/TLS OK\n");
+		fprintf(stdout,"[INFO] Connected to " HOST_NAME ":" HOST_PORT " using server-cert: %s \n", HOST_CERT);
 	}
 	else{
-		puts("SSL/TLS ERROR");	
-		puts("Exiting, cannot establish connection with server");
+		fprintf(stderr,"[ERROR] SSL/TLS ERROR\n");	
+		fprintf(stderr,"[ERROR] Exiting, cannot establish connection with server\n");
 		free(tls_vars);
 		exit(1);
 	}
@@ -87,224 +90,292 @@ int main(void){
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!LoadKeyPair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
-		printf("Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
+		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
 		CreateKeyPair(PUB_KEY,PRIV_KEY,KEYSIZE);
-		puts("Generated Keypair\nPlease restart the binary to load your keypair");
+		fprintf(stdout,"[INFO] Generated Keypair\nPlease restart the binary to load your keypair\n");
 		return 0;
 	}
 	else {
-		puts("Loaded Keypair OK");
-	#ifdef SSC_VERIFY_VARIABLES
+		fprintf(stdout,"[INFO] Loaded Keypair OK\n");
 		assert(test_keypair(pubk_evp,priv_evp) == 1);
-	#endif
 	}
 	//Load SQLITE Database
 	sqlite3 *db = initDB(DB_FNAME);
 	if(db != NULL){
-		puts("Loaded User OK");
+		fprintf(stdout,"[INFO] Loaded User OK\n");
 	}
 	else{
-		puts("Loading db ERROR");
+		fprintf(stderr,"[ERROR] Loading db ERROR\n");
 		goto CLEANUP;	
 	}
 	if(DBUserInit(db,PUB_KEY) != 1){
-		puts("Usercheck ERROR");
+		fprintf(stderr,"[ERROR] Usercheck ERROR\n");
 		goto CLEANUP;
 	}
 #ifdef DEBUG
-	puts("Starting Signing/Verifying Test");
+	fprintf(stdout,"[INFO] Starting Signing/Verifying Test\n");
 	const byte msg[] = "This is a secret message";
 	byte *sig = NULL;
 	size_t slen = 0;
 	int rc = signmsg(msg,sizeof(msg),&sig,&slen,priv_evp);
 	if(rc == 0) {
-       		 printf("Created signature\n");
+       		 fprintf(stdout,"[INFO] Created signature\n");
     	} else {
-       		 printf("Failed to create signature, return code %d\n", rc);
+       		 fprintf(stderr,"[ERROR] Failed to create signature, return code %d\n", rc);
    	}
 	rc = verifymsg(msg,sizeof(msg),sig,slen,pubk_evp);
 	if(rc == 0){
-		puts("Verified Signature");
+		fprintf(stdout,"[INFO] Verified Signature");
 	}	
 	else{
-		puts("failed to verify signature");
+		fprintf(stderr,"[ERROR] failed to verify signature");
 	}
-#endif
+#endif /* DEBUG */
 	
 //register your user
 
-	printf("Your username is: %s, trying to register it with the server\n",getMUSER(db));
+	fprintf(stdout,"[INFO] Your username is: %s, trying to register it with the server\n",getMUSER(db));
 	char* regubuf = (char*)registerUserStr(db);
-	#ifdef SSC_VERIFY_VARIABLES
 	assert(regubuf != NULL && strlen(regubuf) > 0);
-	#endif
 	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
 	char rsp[3];
 	memset(rsp,0,3);			
 	BIO_read(tls_vars->bio_obj,rsp,3);
 	if(strncmp(rsp,"ERR",3) == 0){
-		fprintf(stderr,"Error registering user, maybe user exits ?\n");
+		fprintf(stderr,"[ERROR] Failed to register user, maybe user exits on server side ?\n");
 	}
 	free(regubuf);
 
 //Authenticate USER
 	char* authmsg = AuthUSR(db);
-	printf("Trying to authenticate your user\n");
-	#ifdef SSC_VERIFY_VARIABLES
+	fprintf(stdout,"[INFO] Trying to authenticate your user\n");
 	assert(authmsg != NULL && strlen(authmsg) > 0);
-	#endif
 	BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
 	free(authmsg);
-/* Up to here the GUI and the CLI are the same */
 
+/*
+ * If SSC is compiled with SSC_GUI the user has a choice between CLI and GUI, otherwise the below is never called
+ */
 #ifdef SSC_GUI
+	fprintf(stdout,"[SELECT] Do you want to use the GUI (y/Y | n/N) : ");
+	unsigned int gui_or_cli_selection = fgetc(stdin);
+	while(fgetc(stdin) != '\n'){} //Clear STDIN
+	if(gui_or_cli_selection == 'y' || gui_or_cli_selection == 'Y'){
+
 	/*
-	* Setting up gui variables & more 
+	* Setting up gui variables
 	*/
-	puts("Starting GUI...");
-	struct sscs_backend_variables* backend_vars = malloc(sizeof(struct sscs_backend_variables));
-	backend_vars->pubkey = pubk_evp;
-	backend_vars->privkey = priv_evp;
-	backend_vars->db = db;
-	backend_vars->connection_variables = tls_vars;
-	GtkWidget *window;
-	gtk_init(NULL,NULL);
-	GtkBuilder* gtkBuilder = gtk_builder_new();		
-	gtkBuilder = gtk_builder_new();
-	gtk_builder_add_from_file(gtkBuilder,"gui.glade",NULL);
-	window = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"mainwindow"));
-	GtkWidget *contactslist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"contactslist"));
-	GtkWidget *messagelist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"messageslist"));
-	GtkWidget *sendmessagetext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"sendmessagetext"));
-	GtkWidget *addusertext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"addusertext"));
-	GtkWidget *chatpartnerlabel = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"currentchatpartner"));
-	GtkWidget *recvlist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"recvlist"));
-	struct sscswidgets_gui* widgetsobj = malloc(sizeof(struct sscswidgets_gui));
-	widgetsobj->window = window;
-	widgetsobj->contactslist = contactslist;
-	widgetsobj->messagelist = messagelist;
-	widgetsobj->chatpartnerlabel = (GtkLabel*)chatpartnerlabel;
-	widgetsobj->recvlist = recvlist;
-	widgetsobj->backend_vars = backend_vars;
-	char* username = NULL;
-	widgetsobj->current_username = &username;
-	g_object_unref(G_OBJECT(gtkBuilder));
-	//Connect signals 
-	g_signal_connect(G_OBJECT(window),"destroy",G_CALLBACK(gtk_main_quit),NULL);
-	g_signal_connect(G_OBJECT(sendmessagetext),"activate",G_CALLBACK(send_message_entry_gui),widgetsobj);
-	g_signal_connect(G_OBJECT(addusertext),"activate",G_CALLBACK(add_user_entry_gui),widgetsobj);
-	init_gui(widgetsobj); //Add known users to sidebar (this is NOT gtk_init)
-	gtk_widget_show_all(window);
-	g_timeout_add(1000,&timedupdate_gui,widgetsobj);
-	gtk_main();
-	goto CLEANUP;
+		fprintf(stdout,"[INFO] Starting GUI...");
+		struct sscs_backend_variables* backend_vars = malloc(sizeof(struct sscs_backend_variables));
+		backend_vars->pubkey = pubk_evp;
+		backend_vars->privkey = priv_evp;
+		backend_vars->db = db;
+		backend_vars->connection_variables = tls_vars;
+		GtkWidget *window;
+		gtk_init(NULL,NULL);
+		GtkBuilder* gtkBuilder = gtk_builder_new();		
+		gtkBuilder = gtk_builder_new();
+		gtk_builder_add_from_file(gtkBuilder,"gui.glade",NULL);
+		window = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"mainwindow"));
+		GtkWidget *contactslist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"contactslist"));
+		GtkWidget *messagelist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"messageslist"));
+		GtkWidget *sendmessagetext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"sendmessagetext"));
+		GtkWidget *addusertext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"addusertext"));
+		GtkWidget *chatpartnerlabel = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"currentchatpartner"));
+		GtkWidget *recvlist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"recvlist"));
+		struct sscswidgets_gui* widgetsobj = malloc(sizeof(struct sscswidgets_gui));
+		widgetsobj->window = window;
+		widgetsobj->contactslist = contactslist;
+		widgetsobj->messagelist = messagelist;
+		widgetsobj->chatpartnerlabel = (GtkLabel*)chatpartnerlabel;
+		widgetsobj->recvlist = recvlist;
+		widgetsobj->backend_vars = backend_vars;
+		char* username = NULL;
+		widgetsobj->current_username = &username;
+		g_object_unref(G_OBJECT(gtkBuilder));
+		/* Connect signals to the handlers for sending messages & adding users */
+		g_signal_connect(G_OBJECT(window),"destroy",G_CALLBACK(gtk_main_quit),NULL);
+		g_signal_connect(G_OBJECT(sendmessagetext),"activate",G_CALLBACK(send_message_entry_gui),widgetsobj);
+		g_signal_connect(G_OBJECT(addusertext),"activate",G_CALLBACK(add_user_entry_gui),widgetsobj);
+		init_gui(widgetsobj); //Add known users to sidebar (this is NOT gtk_init)
+		gtk_widget_show_all(window);
+		g_timeout_add(1000,&timedupdate_gui,widgetsobj); //this updates the gui and retrieves messages from the server every 1000ms
+		/* Start Main Loop */
+		gtk_main();
+		goto CLEANUP;
+	}
 #endif /* SSC_GUI */
 
-#ifdef SSC_CLI
-//
-// This is a very Quickly written CLI version
-//
-
-	char* decbuf;
-	char* encbuf;
-	//Buffers for TLS connection
-	char* rxbuf = malloc(4096);
-	char* txbuf = malloc(4096);
-	//Stdin Buffers
-	char* inbuf = malloc(1024);
-	char* inbuf2 = malloc(1024);
-	while(1){ //to be replaced by GUI
-		puts("Options: Send message(1),AddUser(2),Get messages(3)");
-		int options;
-		options = fgetc(stdin);
-		while(fgetc(stdin) != '\n'){} //Clear STDIN
-		switch(options){
-			case '1': //If User wants to send a message do:
-				memset(inbuf,0,1024);
-				memset(inbuf2,0,1024);
-				printf("recipient name: ");
-				fgets(inbuf,1024,stdin);
-				printf("Message to user: ");
-				fgets(inbuf2,1024,stdin);
-				//sending user
-				encbuf = (char*)encryptmsg(inbuf,(unsigned char*)inbuf2,priv_evp,db); //"user" would be the receiving username
-				if(!encbuf)break;
-				printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
-				BIO_write(tls_vars->bio_obj,encbuf,strlen(encbuf));
-				free(encbuf);
-				encbuf = NULL;
-				break;
-
-			case '2': //If User wants to add another user do:
-				memset(inbuf,0,1024);
-				puts("Username for public key to get:");
-				fgets(inbuf,1024,stdin);
-
-				char* gtrsa64 = (char*)ServerGetUserRSA(inbuf);		
-				BIO_write(tls_vars->bio_obj,gtrsa64,strlen(gtrsa64));
-				free(gtrsa64);
-				gtrsa64 = NULL;
-				memset(rxbuf,0,4096);
-				BIO_read(tls_vars->bio_obj,rxbuf,4096);
-				if(strcmp(rxbuf,"GETRSA_RSP_ERROR") == 0){
-					puts(rxbuf);
-				} 
-				else{
-					sqlite3_stmt* stmt;
-					sscso* obj = SSCS_open(rxbuf);
-					char* rsapub64 = SSCS_object_string(obj,"b64rsa");
-					int rsalen = SSCS_object_int(obj,"rsalen");
-					sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
-					sqlite3_bind_text(stmt,1,inbuf,-1,0);
-					sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
-					sqlite3_bind_int(stmt,3,rsalen);
-					sqlite3_step(stmt);
-					sqlite3_finalize(stmt);
-				//	SSCS_data_release(&data);
-					SSCS_release(&obj);
-							
-				}
-				break;
-
-			case '3': //If User wants to receive messages do:
-				puts("Getting Messages from Server...");
-				char* buf = (char*)ServerGetMessages(db);
-				BIO_write(tls_vars->bio_obj,buf,strlen(buf));
-				free(buf);
-				buf = NULL;
-				char *recvbuf2 = malloc(20000);
-				BIO_read(tls_vars->bio_obj,recvbuf2,20000);
-				if(strcmp(recvbuf2,"ERROR") == 0)break;
-				sscsl* list = SSCS_list_open(recvbuf2);
-				int i = 0;
-				while(1){
-					i++;	
-					sscsd* prebuf =	SSCS_list_data(list,i);	
-					if(prebuf == NULL)break;
-					//printf("Got message (index %i) %s\n",i,prebuf->data);
-					sscso* obj2 = SSCS_open(prebuf->data);
-					SSCS_data_release(&prebuf);
-					char* sender = SSCS_object_string(obj2,"sender");
-					//if(sender == NULL)pexit("did not find label sender");
-					decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	
-					if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
-					SSCS_release(&obj2);
-					free(sender);
-					if(decbuf)free(decbuf);
-				}
-				SSCS_list_release(&list);
-				break;
-		default: //Do nothing
-				break;
-		};
-		
-	}
-#endif /* SSCS_CLI */
-CLEANUP:
+	/*
+	 * NCurses CLI Interface 
+	 */
+	ssc_cli_init(); //Start interface
+	init_pair(1,COLOR_CYAN,COLOR_BLACK);
+	init_pair(2,COLOR_GREEN,COLOR_BLACK);
+	int row,col;
+	getmaxyx(stdscr,row,col);
+	/*
+	 * Create Help Window at the start of the application
+	 */
+	attron(COLOR_PAIR(1));
+	WIN* help_window = ssc_cli_cust_newwin(row * 0.85,col * 0.7, 5, 10);
+	ssc_cli_cust_updwin(help_window,TRUE);
+	attroff(COLOR_PAIR(1));
+	attron(A_BOLD);
+	attron(COLOR_PAIR(2));
+	ssc_cli_add_item(help_window,"--- SIMPLESECURECHAT HELP ---");
+	attroff(A_BOLD);
+	ssc_cli_add_item(help_window,"This UI has vim style controls. ");
+	ssc_cli_add_item(help_window,"To switch between columns, use 'h' , 'l' , [TAB] or R/L arrow");
+	ssc_cli_add_item(help_window,"To go down a column, use 'j' or the down arrow.");
+	ssc_cli_add_item(help_window,"To go up a column, use 'k' or the up arrow.");
+	ssc_cli_add_item(help_window,"To quit, hit 'q'");
+	attron(A_BOLD);
+	ssc_cli_add_item(help_window," ");
+	ssc_cli_add_item(help_window,"--- COMMANDS ---");
+	attroff(A_BOLD);
+	ssc_cli_add_item(help_window,"To enter a command, hit ':' .");
+	ssc_cli_add_item(help_window,"Commands can be used for many things, like: ");
+	ssc_cli_add_item(help_window,"Sending messages ':send username message'");
+	ssc_cli_add_item(help_window,"Adding friends ':add username'");
+	ssc_cli_add_item(help_window,"Switching users ':switch username'");
+	ssc_cli_add_item(help_window,"Deleting users ':delete username' ");
+	ssc_cli_add_item(help_window," ");
+	ssc_cli_add_item(help_window,"Hit [ENTER] to begin");
+	(void)getch(); //Wait for userinput
+	ssc_cli_cust_updwin(help_window,FALSE); //delete the window
+	attron(A_BOLD);
+	mvwprintw(stdscr,row-2,1,"To exit,hit 'q'"); //add exit message to bottom of the screen
+	attroff(A_BOLD);
+	attron(COLOR_PAIR(2));
+	/*
+ 	 * Create the 3 Panels(Windows) for Contacts, Received Messages & Sent Messages
+	 */
+	SSCGV* gv = malloc(sizeof(SSCGV)); //allocate memory for general variables structure
+	/* Contacts Window */
+	int contacts_starty = row * 0.02 + 1;
+	int contacts_startx = col * 0.02  ;
+	int contacts_height = row - ((row * 0.05)) - 2;
+	int contacts_width = col/4 - ((col * 0.05));
+	gv->contacts = ssc_cli_cust_newwin(contacts_height,contacts_width,contacts_starty,contacts_startx); 
+	ssc_cli_cust_updwin(gv->contacts,TRUE);	//load the window
 	
-	puts("Cleaning up Objects...");	
+	/* Received Messages Window */
+	int received_starty = row * 0.02 + 1;
+	int received_startx = col * 0.02 + contacts_startx + contacts_width;
+	int received_height = contacts_height;
+	int received_width = ((col - (0.06 * col) - contacts_width )/2) ;
+	gv->received = ssc_cli_cust_newwin(received_height,received_width,received_starty,received_startx); 
+	ssc_cli_cust_updwin(gv->received,TRUE); //load the window
+
+	/* Sent Messages Window */
+	int sent_starty = row * 0.02 + 1;
+	int sent_startx = received_startx + received_width;
+	int sent_height = received_height;
+	int sent_width = received_width; 
+	gv->sent = ssc_cli_cust_newwin(sent_height,sent_width,sent_starty,sent_startx);
+	ssc_cli_cust_updwin(gv->sent,TRUE);
+
+	/* Add Labels to the windows */
+	attroff(COLOR_PAIR(2));
+	attron(COLOR_PAIR(1));
+	attron(A_REVERSE);
+	mvwprintw(stdscr,1,(col * 0.02 + 2)," Contacts ");
+	mvwprintw(stdscr,1,(received_startx + 2)," Received ");
+	mvwprintw(stdscr,1,(sent_startx + 2)," Sent ");
+	attroff(A_REVERSE);
+
+	/* setup the variables for the main loop */
+	int current_panel = 1;
+	int ch,i,x,y;
+	ch = i = x = y = 0;
+	int count = 0;
+	char test[30];
+	char* usrcmd, *message, *username;
+	gv->conn = tls_vars->bio_obj;
+	gv->db = db;
+	gv->current = gv->contacts;
+	gv->previous =  gv->sent;
+	gv->privkey = priv_evp;
+
+	/* load the contacts from the database */
+	ssc_cli_reload_contacts(gv);
+
+	/* Start the Main Loop */
+	while((ch = getch()) != 'q'){
+		switch(ch){
+			case ':': //command mode 
+				usrcmd = _getstr(); //get userinput
+				ssc_cli_cmd_parser(gv,usrcmd); //parse commands
+				free(usrcmd); //free userinput
+				break;
+			case 'j': //go down
+				//Calculate the next curor position (y = y+2)
+				getyx(stdscr,y,x);
+				y += 2;
+
+				if(current_panel == 1){
+					ssc_cli_msg_clear(gv); //clear messages
+					ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); //update the messages column
+					ssc_cli_cursor_move(gv,y,x); //move the cursor to the item below
+					//add clear & reload messages for current 
+				}
+				else if(current_panel == 2){
+					ssc_cli_msg_cursor_move(gv,y,x);
+				}
+				else if(current_panel == 3){
+					ssc_cli_msg_cursor_move(gv,y,x);
+				}
+				ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
+				break;
+			case 'k': //go up 
+				// Calculate the next cursor position (y = y-2)
+				getyx(stdscr,y,x);
+				y -= 2;
+
+				if(current_panel == 1){
+					ssc_cli_msg_clear(gv); //clear messages
+					ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); //update the messages column
+					ssc_cli_cursor_move(gv,y,x); //move the cursor to the item above
+				}
+				else if(current_panel == 2){
+					ssc_cli_msg_cursor_move(gv,y,x);
+				}
+				else if(current_panel == 3){
+					ssc_cli_msg_cursor_move(gv,y,x);
+				}
+
+				ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
+				break;
+			case 9: //tab (Switch to the next window)
+				current_panel++;
+				if((current_panel % 4) == 0)current_panel = 1; //if tab is hit on the last panel, return to the first panel
+				if(current_panel == 1){ //User is in the contacts window
+					gv->current = gv->contacts;
+					gv->previous = gv->sent;
+				}
+				if(current_panel == 2){ // User is in the received window
+					gv->current = gv->received;
+					gv->previous = gv->contacts;
+				}
+				if(current_panel == 3){ //User is in the sent window
+					gv->current = gv->sent;
+					gv->previous = gv->received;
+				}
+				if(gv->previous != gv->contacts)ssc_cli_window_reload(gv->previous); //reload the previous window (to get rid of the highlighted item) if previous != contacts
+				ssc_cli_switch_current(gv->current); //update the cursor
+				ssc_cli_window_upd_highlight(gv); //update the highlighted item 
+				break;
+		}
+		refresh(); // load changes
+	}
+	ssc_cli_end();
+
+/*Clean up objects in memory */
+CLEANUP:
+	fprintf(stdout,"[INFO] Cleaning up Objects...\n");	
 	sqlite3_close(db);
 	EVP_PKEY_free(pubk_evp);
 	EVP_PKEY_free(priv_evp);
@@ -317,5 +388,3 @@ CLEANUP:
 	tls_vars = NULL;
 	return 1;
 }
-
-

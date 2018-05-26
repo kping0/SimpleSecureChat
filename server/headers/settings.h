@@ -25,7 +25,7 @@
 */
 
 /* Miscellaneous */
-//#define DEBUG //uncomment for additional debug info
+#define DEBUG //uncomment for additional debug info
 #define SSC_VERIFY_VARIABLES //sanity check variables 
 
 /* Settings for MySQL/MariaDB */
@@ -34,7 +34,7 @@
 #define SSCDB_PASS "passphrase" //mysql password 
 
 /* Log Settings */
-#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
+//#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
 #define SSCS_LOGFILE "SSCServer.log" //Logfile to write to 
 
 /* Certificate file Settings */
@@ -60,5 +60,11 @@
 	#define cfree(ptr) free(ptr) 
 	#define cmalloc_init() puts("") 
 #endif
+
+/*
+ * Choose between forking (New process for each child -> More Secure) or threading (Same memory space, new stack -> Better Performance)
+ */
+//#define SSCS_CLIENT_FORK
+#define SSCS_CLIENT_THREAD
 
 #endif /* SSC_SETTINGSHFSRV */

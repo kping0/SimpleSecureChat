@@ -17,41 +17,31 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef SSC_SETTINGSHF
-#define SSC_SETTINGSHF
-
 /*
 * This file contains all the configurable settings for SimpleSecureChat (Client)
 */
 
-//You can only have a GUI or a CLI, not both.. if both are defined SSC will not work
-#define SSC_GUI /* To have a Gtk+ GUI */
-//#define SSC_CLI
-/*
- * Uncomment below for debug information
- */
+#ifndef SSC_SETTINGSHF
+#define SSC_SETTINGSHF
+
+/* Uncomment below for debug information */
 //#define DEBUG 
 
-/*
- * Default Server Configuration (Will use the default Server)
- * To change the Server change the HOST_NAME & HOST_CERT to match your servers
- */
+/* Comment out if you want to use your own server */
+//#define _USE_DEFAULT_SERVER
 
+#ifdef _USE_DEFAULT_SERVER
+	#include "../default/default_server.h"
+#else
+	#define HOST_NAME "127.0.0.1"
+	#define HOST_PORT "5050"
+	#define HOST_CERT "public.pem"
+#endif /* _USE_DEFAULT_SERVER */
 
-#define HOST_NAME "52.14.103.245" //Default Server IP
-#define HOST_PORT "5050" //SSC Port
-#define HOST_CERT "default/public.pem" //Default Server Certificate (Change path if your hosting your own server)
-
-/*
-#define HOST_NAME "127.0.0.1"
-#define HOST_PORT "5050"
-#define HOST_CERT "public.pem"
-*/
 #define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
 #define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
 #define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename(Will be generated if not found)
-#define SSC_VERIFY_VARIABLES //error check variables
 
 #endif

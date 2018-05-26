@@ -29,39 +29,63 @@ void sscs_chkaddr(void* ptr,const char* file,int line){
 	if(chv != SSCS_HEAP_MAGIC){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() header checksum error - Called from %s - line %d\n",file,line);
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		exit(1);
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif
 	}
 	byte* rngbytes = readpointer; readpointer += 8;
 	size_t bufsize = *(size_t*)readpointer; readpointer += 8;
 	if(bufsize <= 0){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() bufsize <= 0 - Called from %s - line %d\n",file,line);
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		exit(1);
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif
 	}
 	if(*readpointer != 0x0){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() incorrect padding (!0x0) - Called from %s - line %d\n",file,line);
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		exit(1);
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif
 	}	
 	readpointer++;	
 	readpointer+=bufsize;	
 	if(*readpointer != 0x0){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() (tail) incorrect padding - Called from %s - line %d\n",file,line);
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		exit(1);
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif
 	}
 	readpointer++;
 	if(memcmp(rngbytes,readpointer,8)){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() (tail) header-tail rng doesnt match - Called from %s - line %d\n",file,line);	
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely, exiting\n",orig);
-		exit(1);
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif
 	}
 	readpointer+=8;
 	chv = *(int*)readpointer;
 	if(chv != SSCS_HEAP_MAGIC){
 		fprintf(stderr,"[ERROR] sscs_chkaddr() tail checksum error - Called from %s - line %d\n",file,line);
 		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		exit(1);	
+		#ifdef SSCS_CLIENT_FORK
+	exit(1);
+#else
+	pthread_exit(NULL);
+#endif	
 	}
 	return;	
 }

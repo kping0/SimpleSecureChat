@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -45,7 +46,16 @@
 #include "headers/base64.h" //MIT base64 function (BSD LICENSE)
 #include "headers/serialization.h" //SSCS Library
 #include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
+
+struct sscs_handler_data{
+	int client_socket;
+	SSL_CTX* ctx;
+	pthread_t* thread_info;	
+};
+
 int sock = 0; //Global listen variable so it can be closed from a signal handler
+
+void* _ClientHandler(void* data);
 
 int main(void){
 
@@ -81,12 +91,56 @@ int main(void){
 #ifdef DEBUG
 	fprintf(stdout,"Info: Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
 #endif /* DEBUG */
+
+		struct sscs_handler_data* _hdl_data = cmalloc(sizeof(struct sscs_handler_data));
+		if(!_hdl_data){
+			fprintf(stderr,"[ERROR] Failed to allocate memory for thread_data\n");
+			exit(0);
+		}
+
+		_hdl_data->client_socket = client;
+		_hdl_data->ctx = ctx;
+		
+	#ifdef SSCS_CLIENT_FORK	
+
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
 	* by childexit_handler
 	*/
-	pid_t pid = fork();
-	if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 
+		pid_t pid = fork();
+		if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 		
+			_ClientHandler(_hdl_data);
+		}
+
+	#endif /* SSCS_CLIENT_FORK */
+	#ifdef SSCS_CLIENT_THREAD
+		pthread_t _thr_id;
+		if(pthread_create(&_thr_id,NULL,_ClientHandler,_hdl_data)){
+			fprintf(stderr,"[ERROR] failed to create thread  %s\n",strerror(errno));
+			cfree(_hdl_data);
+			exit(0);
+		}
+
+	#endif /* SSCS_CLIENT_THREAD */	
+	} 
+    //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
+#ifdef DEBUG
+    fprintf(stdout,"[DEBUG] Server Main Process is shutting down..\n");
+#endif
+    close(sock);
+    SSL_CTX_free(ctx);
+    cleanup_openssl();
+#ifdef SSCS_LOGTOFILE
+    fclose(stderrl);
+    fclose(stdoutl);
+#endif /* SSCS_LOGTOFILE */
+    return 0;
+}
+void* _ClientHandler(void* data){
+		struct sscs_handler_data* client_info = data;
+		int client = client_info->client_socket;
+		SSL_CTX* ctx = client_info->ctx;
+
 		signal(SIGINT,SIG_DFL); //unbind sigint for segfault
 		cmalloc_init();	
 		if (client < 0) {
@@ -102,9 +156,7 @@ int main(void){
 		SSL_accept(ssl);
 		ERR_print_errors_fp(stderr);
 		BIO *bio = BIO_pop(accept_bio);
-		#ifdef SSC_VERIFY_VARIABLES
 		assert(ssl != NULL);
-		#endif
 		char* buf = cmalloc(4096); //Main receive buffer for receiving from SSL socket
 		MYSQL* db = get_handle_DB();
 		while(1){ //Handle request until interrupt or connection problems	
@@ -122,7 +174,7 @@ int main(void){
 			sscso* obj0 = SSCS_open((byte*)buf);
 			int msgp0  = SSCS_object_int(obj0,"msgp");
 	#ifdef DEBUG
-			fprintf(stdout,"Update: Message arrived with message purpose %i\n",msgp0);
+			fprintf(stdout,"[DEBUG] Message arrived with message purpose %i\n",msgp0);
 	#endif
 			if(msgp0 == REGRSA){ //User wants to register a username with a public key
 				char* rusername = (char*)SSCS_object_string(obj0,"rusername");
@@ -139,7 +191,7 @@ int main(void){
 				}
 				else{
 	#ifdef DEBUG
-					fprintf(stdout,"Update: User \"%s\" is trying to register\n",rusername);
+					fprintf(stdout,"[DEBUG] User \"%s\" is trying to register\n",rusername);
 	#endif
 					char* b64rsa = (char*)SSCS_object_string(obj0,"b64rsa");
 					int rsalen = SSCS_object_int(obj0,"rsalen");
@@ -152,7 +204,7 @@ int main(void){
 					}
 					else{
 	#ifdef DEBUG
-						fprintf(stdout,"Update: User \"%s\" registered\n",rusername);	
+						fprintf(stdout,"[DEBUG] User \"%s\" registered\n",rusername);	
 	#endif
 						SSL_write(ssl,"OK",2);
 						cfree(rusername);
@@ -161,7 +213,7 @@ int main(void){
 			}
 			else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
 	#ifdef DEBUG
-				fprintf(stdout,"Update: User sent request to authenticate,handling...\n");
+				fprintf(stdout,"[DEBUG] User sent request to authenticate,handling...\n");
 	#endif
 				char* userauthk = (char*)SSCS_object_string(obj0,"authkey");
 				if(strlen(userauthk) < 256){
@@ -176,7 +228,7 @@ int main(void){
 				}
 				if(SSCS_comparehash((byte*)userauthk,strlen(userauthk),hash) == SSCS_HASH_VALID){
 	#ifdef DEBUG
-					fprintf(stdout,"Update: User \"%s\" authenticated.\n",authusername);
+					fprintf(stdout,"[DEBUG] User \"%s\" authenticated.\n",authusername);
 	#endif /* DEBUG */
 					SSCS_release(&obj0);
 					SSCS_freehash(&hash);
@@ -202,12 +254,12 @@ int main(void){
 						*/
 						if(msgp == GETRSA){ //Client is requesting a User Public Key
 	#ifdef DEBUG
-							fprintf(stdout,"Update: Client Requested Public Key,handling...\n");
+							fprintf(stdout,"[DEBUG] Client Requested Public Key,handling...\n");
 	#endif /* DEBUG */
 							char* rsausername = (char*)SSCS_object_string(obj,"username");
 							const char* uRSAenc = GetEncodedRSA(rsausername,db);
 	#ifdef DEBUG
-							fprintf(stdout,"Update: Sending buffer \"%s\"\n",uRSAenc);
+							fprintf(stdout,"[DEBUG] Sending buffer \"%s\"\n",uRSAenc);
 	#endif /* DEBUG */
 							if(uRSAenc){
 								SSL_write(ssl,uRSAenc,strlen(uRSAenc));	
@@ -217,12 +269,12 @@ int main(void){
 						}
 						else if(msgp == MSGREC){ //Client is requesting stored messages
 	#ifdef DEBUG
-							fprintf(stdout,"Update: Client Requesting New Messages, handling...\n");
+							fprintf(stdout,"[DEBUG] Client Requesting New Messages, handling...\n");
 	#endif /* DEBUG */
 							char* retmsg = GetUserMessagesSRV(authusername,db);
 	#ifdef DEBUG
-							fprintf(stdout,"Update: msg is %s\n",retmsg);
-							fprintf(stdout,"Update: Length of messages returned is %d\n",(int)strlen(retmsg));
+							fprintf(stdout,"[DEBUG] msg is %s\n",retmsg);
+							fprintf(stdout,"[DEBUG] Length of messages returned is %d\n",(int)strlen(retmsg));
 	#endif /* DEBUG */
 							if(strlen(retmsg) != 0){ 
 								SSL_write(ssl,retmsg,strlen(retmsg));
@@ -245,7 +297,7 @@ int main(void){
 							if( newline ) *newline = 0;
 							char* b64modbuf = obj->buf_ptr;
 	#ifdef DEBUG
-							fprintf(stdout,"Update: buffering message from %s to %s\n",authusername,recipient);
+							fprintf(stdout,"[DEBUG] buffering message from %s to %s\n",authusername,recipient);
 	#endif /* DEBUG */
 							if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
 								fprintf(stderr,"[ERROR] Error occurred adding MSG to Database\n");
@@ -253,55 +305,42 @@ int main(void){
 						}
 						SSCS_release(&obj);
 #ifdef SSCS_LOGTOFILE
-						fflush(stdoutl);
-						fflush(stderrl);
+						fflush(stdout);
+						fflush(stderr);
 #endif /* SSCS_LOGTOFILE */
 					}
 				}
 				else{
-					printf("User %s failed to authenticate.\n",authusername);
+					fprintf(stderr,"[ERROR] User %s failed to authenticate.\n",authusername);
 					SSCS_freehash(&hash);
 				}	
 			}
 			else{
-				puts("Message received with no specific purpose");
 				fprintf(stderr,"[ERROR] ? Message received with no specific purpose, exiting...\n");
 				SSCS_release(&obj0);
 				goto end;
 			}
 			SSCS_release(&obj0);
 #ifdef SSCS_LOGTOFILE
-			fflush(stdoutl);
-			fflush(stderrl);
+			fflush(stdout);
+			fflush(stderr);
 #endif /* SSCS_LOGTOFILE */
 		}
 	end: //cleanup & exit
 	#ifdef DEBUG
-		fprintf(stdout,"Update: Ending Client Session\n");
+		fprintf(stdout,"[DEBUG] Ending Client Session\n");
 	#endif /* DEBUG */
 		BIO_free(bio);
 		SSL_free(ssl);
 		close(client); 
 		cfree(buf); 
+	#ifdef SSCS_CLIENT_FORK 
 		exit(0);
-	} 
+	#else 
+		pthread_exit(0);
+	#endif
 	/*
 	* End of Client Handler Code
 	*/
 
-
-    } 
-    //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
-#ifdef DEBUG
-    fprintf(stdout,"Update: Server Main Process is shutting down..\n");
-#endif
-    close(sock);
-    SSL_CTX_free(ctx);
-    cleanup_openssl();
-#ifdef SSCS_LOGTOFILE
-    fclose(stderrl);
-    fclose(stdoutl);
-#endif /* SSCS_LOGTOFILE */
-    return 0;
 }
-

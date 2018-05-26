@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 #include "settings.h"
 
 

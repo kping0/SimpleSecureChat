@@ -19,7 +19,7 @@
 # */
 
 #Security flags for compiling
-security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now 
+security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now -lpthread
 
 SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o
 	gcc $(security_flags) -o SSCServer base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o `mysql_config --cflags --libs` -lcrypto -lssl

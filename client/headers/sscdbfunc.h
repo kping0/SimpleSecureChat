@@ -37,6 +37,7 @@
 #include <sqlite3.h> 
 
 #include "settings.h"
+#include "msgfunc.h"
 #include "base64.h"
 
 //Message Purposes
@@ -53,27 +54,37 @@
 #define AUTHUSR_RSP 10
 
 
-sqlite3* initDB(char* dbfname);
+sqlite3* init_db(char* dbfname);
 
-void addKnownUser(char* username,RSA *userpubkey,sqlite3 *db,char* authkey);
+void add_known_user(char* username,RSA *userpubkey,sqlite3 *db,char* authkey);
 
-int getUserUID(char* username,sqlite3 *db);
+int get_user_uid(char* username,sqlite3 *db);
 
-int DBUserInit(sqlite3 *db,char* pkeyfn);
+int db_user_init(sqlite3 *db,char* pkeyfn);
 
 EVP_PKEY *get_pubk_username(char* username,sqlite3 *db);
 
 EVP_PKEY *get_pubk_uid(int uid,sqlite3 *db);
 
-const char* registerUserStr(sqlite3* db); //returns string you can pass to server to register your user with your public key.
+const char* register_user_str(sqlite3* db); //returns string you can pass to server to register your user with your public key.
 
-const char* ServerGetUserRSA(char* username);
+const char* server_get_user_rsa(char* username);
 
-const char* ServerGetMessages(sqlite3* db); //Returns string that the server will interpret to send you your messages.
+const char* server_get_messages(sqlite3* db); //Returns string that the server will interpret to send you your messages.
 	
-char* getMUSER(sqlite3* db); //Returns Username that has the uid=1 (your username)
+char* get_muser(sqlite3* db); //Returns Username that has the uid=1 (your username)
 
-char* AuthUSR(sqlite3* db);
+char* auth_usr(sqlite3* db);
 
-int AddMessage(char* message, char* recipient,char* sender, sqlite3* db); //Add message to database
+void* update_messages_db(void* data);
+	
+/* Starts the one second update process */
+void start_message_update(void* data);
+
+/* Spawned by start_message_update,spawns an update thread every one second */ 
+void* message_update_spawner(void* data);
+
+/* Spawned by message_update_spawner */
+void* update_messages_db(void* data);
+
 #endif

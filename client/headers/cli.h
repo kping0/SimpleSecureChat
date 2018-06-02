@@ -114,4 +114,7 @@ unsigned char* ssc_cli_currently_selected(WIN* p_win);
 
 void ssc_cli_reload_contacts(SSCGV* gv);
 
+void ssc_cli_msg_upd(SSCGV* gv,char* username);
+	
+
 #endif /* SSC_CLI_MENU_HEADER */

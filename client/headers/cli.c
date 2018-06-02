@@ -1,5 +1,4 @@
 
-
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -23,7 +22,6 @@
 void ssc_cli_init(void){
 	initscr();
 	start_color();
-	cbreak();
 	keypad(stdscr,TRUE);
 	noecho();
 	init_pair(1,COLOR_CYAN,COLOR_BLACK);
@@ -442,6 +440,10 @@ void ssc_cli_msg_clear(SSCGV* gv){
 	ssc_cli_switch_current(gv->current);
 	return;
 }
+
+/*
+ * update the messages from the db
+ */
 void ssc_cli_msg_upd(SSCGV* gv,char* username){
 	ssc_cli_msg_clear(gv);
 	sqlite3* db = gv->db;
@@ -452,9 +454,12 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 	WIN* messagelist = gv->sent;
 	char* current_user = username;
 	if(!current_user)return;
-	char* getmsgbuf = (char*)ServerGetMessages(db);	//Get buffer to send to server
+/*
+ * if SSC_UPDATE_THREAD is NOT present, update messages here.
+ */
+#ifndef SSC_UPDATE_THREAD
+	char* getmsgbuf = (char*)server_get_messages(db);	//Get buffer to send to server
 	if(!getmsgbuf)return;
-
 	char* decbuf = NULL;
 	char* recvbuf = malloc(200000);
 	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	//Send buffer to server
@@ -473,9 +478,9 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 			SSCS_data_release(&prebuf);
 			char* sender = SSCS_object_string(obj2,"sender");
 			if(!sender)break;
-			decbuf = (char*)decryptmsg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
+			decbuf = (char*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
-			sqlite3_bind_int(stmt,1,getUserUID(sender,db));
+			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));
 			sqlite3_bind_text(stmt,2,decbuf,-1,0);
 			sqlite3_step(stmt);
 			sqlite3_finalize(stmt);
@@ -487,12 +492,12 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 		SSCS_list_release(&list);
 	}
 	free(recvbuf);
-	int currentuserUID = getUserUID(current_user,db);
+#endif /* !SSC_UPDATE_THREAD */
+	int currentuserUID = get_user_uid(current_user,db);
 #ifdef DEBUG
 	fprintf(stdout,"DEBUG: Current user %s has id %i\n",current_user,currentuserUID);
 #endif
 	if(currentuserUID == -1)return;
-
 	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 OR uid2=?2",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,currentuserUID);
 	sqlite3_bind_int(stmt,2,currentuserUID);
@@ -509,7 +514,11 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 	ssc_cli_switch_current(gv->current);
 	return;
 }
-void ssc_cli_reload_contacts(SSCGV* gv){ //clear contacts and reload them 
+
+/*
+ * clear contacts and reload them from the db
+ */
+void ssc_cli_reload_contacts(SSCGV* gv){ 
 	WIN* contacts = gv->contacts;
 	WPAGE* _page;
 	sqlite3_stmt* stmt;
@@ -546,7 +555,11 @@ void ssc_cli_reload_contacts(SSCGV* gv){ //clear contacts and reload them
 	ssc_cli_switch_current(gv->current);
 	return;
 }
-void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){ //parse user commands
+
+/*
+ * parse user commands 
+ */
+void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){ 
 	WIN* contacts = gv->contacts;
 	WIN* received = gv->received;
 	WIN* sent = gv->sent;
@@ -562,10 +575,11 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){ //parse user commands
 		char* usrname = strtok(tmp," ");	
 		size_t usrnamel = strlen(tmp);
 		byte* message = tmp+usrnamel+1;
-		byte* encbuf = encryptmsg(usrname,message,privkey,db); if(!encbuf)return;
+		byte* encbuf = encrypt_msg(usrname,message,privkey,db); 
+		if(!encbuf)return;
 		sqlite3_stmt* stmt;
 		sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,1,?1,?2);",-1,&stmt,NULL);
-		sqlite3_bind_int(stmt,1,getUserUID(usrname,db));
+		sqlite3_bind_int(stmt,1,get_user_uid(usrname,db));
 		sqlite3_bind_text(stmt,2,message,-1,0);
 		sqlite3_step(stmt);
 		sqlite3_finalize(stmt);
@@ -574,7 +588,7 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){ //parse user commands
 		ssc_cli_msg_upd(gv,usrname);
 	}
 	else if(strncmp(userinput,"add",3) == 0){
-		char* usraddbuf = (char*)ServerGetUserRSA(userinput+4);
+		char* usraddbuf = (char*)server_get_user_rsa(userinput+4);
 		BIO_write(conn,usraddbuf,strlen(usraddbuf));
 		free(usraddbuf);
 		char* rxbuf = calloc(1,4096);

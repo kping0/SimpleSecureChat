@@ -62,9 +62,18 @@
 #endif
 
 /*
- * Choose between forking (New process for each child -> More Secure) or threading (Same memory space, new stack -> Better Performance)
+ * How to handle each client:
+ * forking (New process for each child -> More Secure)
+ * threading (Same memory space, new stack -> Better Performance)
  */
 //#define SSCS_CLIENT_FORK
 #define SSCS_CLIENT_THREAD
+
+#if defined SSCS_CLIENT_FORK && defined SSCS_CLIENT_THREAD
+#error [ERROR] (settings.h) You cannot fork and thread at the same time 
+#endif
+#if  !(defined SSCS_CLIENT_FORK || defined SSCS_CLIENT_THREAD)
+#error [ERROR] (settings.h) You must either fork or thread
+#endif
 
 #endif /* SSC_SETTINGSHFSRV */

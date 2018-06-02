@@ -16,10 +16,11 @@
 # *  You should have received a copy of the GNU General Public License
 # *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # */
+debug_flags = -O0 -g3 
 
 security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now
 
-flags = $(security_flags) -std=c99 
+flags = $(security_flags) -std=c99 -lpthread -D_POSIX_C_SOURCE=199309L -DSQLITE_THREADSAFE=1
 
 gui_flags = -DSSC_GUI `pkg-config --cflags gtk+-3.0` `pkg-config --cflags glib-2.0` `pkg-config --libs gtk+-3.0` `pkg-config --libs glib-2.0`
 

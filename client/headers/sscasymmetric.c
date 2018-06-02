@@ -85,7 +85,7 @@ int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_le
  * End of functions taken from the OpenSSL wiki, GPL3 Applies for the rest of the functions
  */
 
-int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path4privkey){
+int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path4privkey){
 	/*
 	* This Function reads the Public&Private key from files into (initialized)EVP_PKEY objects...
 	*/
@@ -118,7 +118,7 @@ int LoadKeyPair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path
 
 }
 
-void CreateKeyPair(char* path4pubkey,char* path4privkey,int keysize){
+void create_keypair(char* path4pubkey,char* path4privkey,int keysize){
     RSA* rsa = RSA_new();
     BIGNUM* prime = BN_new();
     BN_set_word(prime,RSA_F4);

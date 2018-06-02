@@ -19,7 +19,7 @@
 
 #include "msgfunc.h"
 
-const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 	if(strlen((const char*)message) > 1024){
 		fprintf(stderr,"Message too long(limit 1024)\n");
 		return NULL;	
@@ -52,7 +52,7 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen((const char*)username));
 	byte *sig = NULL;
 	size_t sigl = 0;
-	int rc = signmsg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
+	int rc = sign_msg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
 	if(!(rc == 0)){
 		fprintf(stderr,"error signing message\n");
 		SSCS_release(&sigmsg);
@@ -92,7 +92,7 @@ const char* encryptmsg(char* username,unsigned char* message,EVP_PKEY* signingKe
 }
 
 	
-const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
+const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
 	if(encrypted_buffer == NULL){
 		fprintf(stderr,"Error decrypting\n");
 		return NULL;	
@@ -153,7 +153,7 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 	byte* sig = sig_data->data;
 	int sigl = sig_data->len;
 
-	int rc = verifymsg(serializedobj3,serializedobj3l,sig,sigl,userpubk);
+	int rc = verify_msg(serializedobj3,serializedobj3l,sig,sigl,userpubk);
 
 	if(rc == 0){
 #ifdef DEBUG
@@ -187,7 +187,7 @@ const char* decryptmsg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* d
 /*
  * This Everything below this point is taken from the OpenSSL wiki -> the LICENSE for these functions is * https://www.openssl.org/source/license.html
  */
-int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey)
+int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey)
 {
     /* Returned to caller */
     int result = -1;
@@ -288,7 +288,7 @@ int signmsg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pk
     return !!result;
 }
 
-int verifymsg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey)
+int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey)
 {
     /* Returned to caller */
     int result = -1;

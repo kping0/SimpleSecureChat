@@ -46,6 +46,6 @@ struct ssl_str{
 	const SSL_METHOD *sslmethod;
 	};
 #endif
-int TLS_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port);
+int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port);
 
 #endif

@@ -28,7 +28,7 @@
 //#define DEBUG 
 
 /* Comment out if you want to use your own server */
-//#define _USE_DEFAULT_SERVER
+#define _USE_DEFAULT_SERVER
 
 #ifdef _USE_DEFAULT_SERVER
 	#include "../default/default_server.h"
@@ -43,5 +43,14 @@
 #define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
 
 #define DB_FNAME "sscdb.db" //SQLITE Database Filename(Will be generated if not found)
+
+/*
+ * By default SSC spawns a seperate thread to get new messages from the server, to disable this 
+ * feature comment out the line below (SSC_UPDATE_THREAD)
+ * if not using a seperate thread, updates will be done by ssc_cli_msg_upd() (in headers/cli.c) 
+ * at a set interval
+ */
+#define SSC_UPDATE_THREAD
+#define SSC_UPDATE_INTERVAL 1000 //only applicable if using a seperate update thread
 
 #endif

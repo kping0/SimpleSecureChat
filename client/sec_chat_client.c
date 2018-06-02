@@ -38,7 +38,7 @@
 #include <openssl/pem.h>
 #include <sqlite3.h> 
 
-//Custom headers
+/* Custom Header */
 #include "headers/sscssl.h" //Connection functions
 #include "headers/sscasymmetric.h" //keypair functions
 #include "headers/sscdbfunc.h" //DB manipulation functions 
@@ -46,7 +46,8 @@
 #include "headers/serialization.h" //SimpleSecureSerialization library (to replace binn)
 #include "headers/msgfunc.h" //encrypt-decrypt-verify-sign functions
 #include "headers/settings.h" //Modify to change configuration of SSC
-#include "headers/cli.h" //Cli 
+#include "headers/cli.h" //cli functions
+#include "headers/thread_locking.h" //thread locking code
 
 #ifdef SSC_GUI
 #include <gtk/gtk.h>
@@ -65,8 +66,8 @@ gboolean timedupdate_gui(void* data){
 typedef unsigned char byte;
 
 int pexit(char* error){
-	fprintf(stdout,"[ERROR] Exiting, error : %s\n",error);
-	exit(1);
+	fprintf(stderr,"[ERROR] Exiting, error : %s\n",error);
+	exit(EXIT_FAILURE);
 }
 
 //Startpoint
@@ -76,7 +77,7 @@ int main(void){
 	fprintf(stdout,"[INFO] Host your own server with ('https://github.com/kping0/simplesecurechat/server')\n");
 	//Setup SSL Connection
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
-	if(TLS_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
+	if(tls_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
 		fprintf(stdout,"[INFO] SSL/TLS OK\n");
 		fprintf(stdout,"[INFO] Connected to " HOST_NAME ":" HOST_PORT " using server-cert: %s \n", HOST_CERT);
 	}
@@ -86,14 +87,15 @@ int main(void){
 		free(tls_vars);
 		exit(1);
 	}
+	init_locks(); //add locks for openssl
 	//Load Keypair From Disk
 	EVP_PKEY* pubk_evp = EVP_PKEY_new();
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
-	if(!LoadKeyPair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
+	if(!load_keypair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
 		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
-		CreateKeyPair(PUB_KEY,PRIV_KEY,KEYSIZE);
+		create_keypair(PUB_KEY,PRIV_KEY,KEYSIZE);
 		fprintf(stdout,"[INFO] Generated Keypair\nPlease restart the binary to load your keypair\n");
 		return 0;
 	}
@@ -102,7 +104,7 @@ int main(void){
 		assert(test_keypair(pubk_evp,priv_evp) == 1);
 	}
 	//Load SQLITE Database
-	sqlite3 *db = initDB(DB_FNAME);
+	sqlite3 *db = init_db(DB_FNAME);
 	if(db != NULL){
 		fprintf(stdout,"[INFO] Loaded User OK\n");
 	}
@@ -110,7 +112,7 @@ int main(void){
 		fprintf(stderr,"[ERROR] Loading db ERROR\n");
 		goto CLEANUP;	
 	}
-	if(DBUserInit(db,PUB_KEY) != 1){
+	if(db_user_init(db,PUB_KEY) != 1){
 		fprintf(stderr,"[ERROR] Usercheck ERROR\n");
 		goto CLEANUP;
 	}
@@ -136,8 +138,8 @@ int main(void){
 	
 //register your user
 
-	fprintf(stdout,"[INFO] Your username is: %s, trying to register it with the server\n",getMUSER(db));
-	char* regubuf = (char*)registerUserStr(db);
+	fprintf(stdout,"[INFO] Your username is: %s, trying to register it with the server\n",get_muser(db));
+	char* regubuf = (char*)register_user_str(db);
 	assert(regubuf != NULL && strlen(regubuf) > 0);
 	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
 	char rsp[3];
@@ -149,7 +151,7 @@ int main(void){
 	free(regubuf);
 
 //Authenticate USER
-	char* authmsg = AuthUSR(db);
+	char* authmsg = auth_usr(db);
 	fprintf(stdout,"[INFO] Trying to authenticate your user\n");
 	assert(authmsg != NULL && strlen(authmsg) > 0);
 	BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
@@ -254,7 +256,7 @@ int main(void){
  	 * Create the 3 Panels(Windows) for Contacts, Received Messages & Sent Messages
 	 */
 	SSCGV* gv = malloc(sizeof(SSCGV)); //allocate memory for general variables structure
-	/* Contacts Window */
+	/* Create Contacts Window */
 	int contacts_starty = row * 0.02 + 1;
 	int contacts_startx = col * 0.02  ;
 	int contacts_height = row - ((row * 0.05)) - 2;
@@ -262,7 +264,7 @@ int main(void){
 	gv->contacts = ssc_cli_cust_newwin(contacts_height,contacts_width,contacts_starty,contacts_startx); 
 	ssc_cli_cust_updwin(gv->contacts,TRUE);	//load the window
 	
-	/* Received Messages Window */
+	/* Create Received Messages Window */
 	int received_starty = row * 0.02 + 1;
 	int received_startx = col * 0.02 + contacts_startx + contacts_width;
 	int received_height = contacts_height;
@@ -270,7 +272,7 @@ int main(void){
 	gv->received = ssc_cli_cust_newwin(received_height,received_width,received_starty,received_startx); 
 	ssc_cli_cust_updwin(gv->received,TRUE); //load the window
 
-	/* Sent Messages Window */
+	/* Create Sent Messages Window */
 	int sent_starty = row * 0.02 + 1;
 	int sent_startx = received_startx + received_width;
 	int sent_height = received_height;
@@ -291,63 +293,76 @@ int main(void){
 	int current_panel = 1;
 	int ch,i,x,y;
 	ch = i = x = y = 0;
-	int count = 0;
-	char test[30];
-	char* usrcmd, *message, *username;
+	char* usrcmd;
+
 	gv->conn = tls_vars->bio_obj;
 	gv->db = db;
 	gv->current = gv->contacts;
 	gv->previous =  gv->sent;
 	gv->privkey = priv_evp;
 
-	/* load the contacts from the database */
-	ssc_cli_reload_contacts(gv);
+
+#ifdef SSC_UPDATE_THREAD
+	start_message_update(gv); /* Start the seperate message update thread */
+#endif /* SSC_UPDATE_THREAD */
+
+	ssc_cli_reload_contacts(gv); /* load the contacts from the database */
 
 	/* Start the Main Loop */
+	halfdelay(5); /* Set halfdelay to   */
 	while((ch = getch()) != 'q'){
 		switch(ch){
+			case ERR: 
+				ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); /* update the messages tab */
+				break;
 			case ':': //command mode 
+				cbreak(); //switch out of halfdelay
 				usrcmd = _getstr(); //get userinput
 				ssc_cli_cmd_parser(gv,usrcmd); //parse commands
 				free(usrcmd); //free userinput
+				halfdelay(5); //switch back into halfdelay
 				break;
 			case 'j': //go down
 				//Calculate the next curor position (y = y+2)
 				getyx(stdscr,y,x);
 				y += 2;
-
 				if(current_panel == 1){
 					ssc_cli_msg_clear(gv); //clear messages
-					ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); //update the messages column
+
 					ssc_cli_cursor_move(gv,y,x); //move the cursor to the item below
 					//add clear & reload messages for current 
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
+					ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); //update the messages column
 				}
 				else if(current_panel == 2){
 					ssc_cli_msg_cursor_move(gv,y,x);
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				}
 				else if(current_panel == 3){
 					ssc_cli_msg_cursor_move(gv,y,x);
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				}
-				ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				break;
 			case 'k': //go up 
 				// Calculate the next cursor position (y = y-2)
 				getyx(stdscr,y,x);
 				y -= 2;
-
 				if(current_panel == 1){
 					ssc_cli_msg_clear(gv); //clear messages
+
+					ssc_cli_cursor_move(gv,y,x); //move the cursor to the item below
+					//add clear & reload messages for current 
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 					ssc_cli_msg_upd(gv,ssc_cli_currently_selected(gv->contacts)); //update the messages column
-					ssc_cli_cursor_move(gv,y,x); //move the cursor to the item above
 				}
 				else if(current_panel == 2){
 					ssc_cli_msg_cursor_move(gv,y,x);
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				}
 				else if(current_panel == 3){
 					ssc_cli_msg_cursor_move(gv,y,x);
-				}
-
-				ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
+					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
+				}			
 				break;
 			case 9: //tab (Switch to the next window)
 				current_panel++;
@@ -386,5 +401,6 @@ CLEANUP:
 	SSL_CTX_free(tls_vars->ctx);
 	free(tls_vars);
 	tls_vars = NULL;
+	kill_locks();
 	return 1;
 }

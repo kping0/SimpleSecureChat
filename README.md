@@ -1,6 +1,6 @@
 <h1>SimpleSecureChat</h1>
 <h2>Description</h2>
- SimpleSecureChat is a simple, end to end encrypted opensource messaging application that minimizes dependencies & exposure and maximizes security & simplicity. The code is meant to be easy to read and understand. Currently the Client and Server code combined is less than 10,000 lines.
+ <h5>SimpleSecureChat is a simple, end to end encrypted opensource messaging application that minimizes dependencies & exposure and maximizes security & simplicity. The code is meant to be easy to read and understand. Currently the Client and Server code combined is less than 10,000 lines.</h5>
   
 <h2>Building and Configuration of Client & Server</h2>
   Go to our Wiki page https://github.com/kping0/SimpleSecureChat/wiki

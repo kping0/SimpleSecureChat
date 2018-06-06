@@ -20,7 +20,7 @@
 #include "sscsrvfunc.h"
 
 void pexit(char* errormsg){
-	fprintf(stderr,"[ERROR] %s\n",errormsg);
+	cerror(" %s\n",errormsg);
 #ifdef SSCS_CLIENT_FORK
 	exit(1);
 #else
@@ -29,7 +29,7 @@ void pexit(char* errormsg){
 } /* pexit */
 
 void exit_mysql_err(MYSQL* con){ //print exit message and exit
-	fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
+	cerror(" %s\n",mysql_error(con));
 	mysql_close(con);
 	#ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -45,17 +45,15 @@ int my_mysql_query(MYSQL* con,char* query){ //mysql_query() with error checking
 } /* my_mysql_query */
 
 void init_DB(void){ //prepare database
-#ifdef DEBUG
-	fprintf(stdout,"Info: MySQL client version-> %s\n",mysql_get_client_info());
-#endif /* DEBUG */
+	cinfo("MySQL client version-> %s\n",mysql_get_client_info());
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
-		fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
+		cerror(" %s\n",mysql_error(con));
 		exit(1);
 	}
 	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,NULL,0,NULL,0))exit_mysql_err(con);
 	if(mysql_query(con,"use SSCServerDB")){
-		fprintf(stderr,"[ERROR] ? Server DB not found, First Time Run? -> Trying to Create Database\n");
+		cerror(" ? Server DB not found, First Time Run? -> Trying to Create Database\n");
 		if(mysql_query(con,"CREATE DATABASE SSCServerDB"))exit_mysql_err(con);
 		if(mysql_query(con,"use SSCServerDB"))exit_mysql_err(con);
 		
@@ -70,7 +68,7 @@ void init_DB(void){ //prepare database
 MYSQL* get_handle_DB(void){ //return active handle to database
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
-		fprintf(stderr,"[ERROR] %s\n",mysql_error(con));
+		cerror(" %s\n",mysql_error(con));
 #ifdef SSCS_CLIENT_FORK
 	exit(1);
 #else
@@ -91,18 +89,18 @@ int create_socket(int port){ //bind socket s to port and return socket s
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
-	fprintf(stderr,"[ERROR] Unable to create socket\n");
+	cerror(" Unable to create socket\n");
 	exit(EXIT_FAILURE);
     }
     int enable = 1;
     setsockopt(s,SOL_SOCKET,SO_REUSEADDR,&enable,sizeof(int));
     if (bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-	fprintf(stderr,"[ERROR] Unable to bind, is server already running?\n");
+	cerror(" Unable to bind, is server already running?\n");
 	exit(EXIT_FAILURE);
     }
 
     if (listen(s, 1) < 0) {
-	fprintf(stderr,"[ERROR] Unable to listen\n");
+	cerror(" Unable to listen\n");
 	exit(EXIT_FAILURE);
     }
     assert(s != 0);
@@ -126,7 +124,7 @@ SSL_CTX *create_context(){
 
     ctx = SSL_CTX_new(method);
     if (!ctx) {
-	fprintf(stderr,"[ERROR] Unable to create SSL context\n");
+	cerror(" Unable to create SSL context\n");
 	ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
@@ -154,7 +152,7 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 	if(!stmt)return 1; //make sure user is not added if an error occurs
 	char* statement = "SELECT UID FROM KNOWNUSERS WHERE username=?";
 	if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-		fprintf(stderr,"[ERROR] stmt prepare failed (%s)\n",mysql_stmt_error(stmt));
+		cerror(" stmt prepare failed (%s)\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 #ifdef SSCS_CLIENT_FORK
@@ -171,7 +169,7 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 	bind[0].is_null=0;
 	bind[0].length=0;
 	if(mysql_stmt_bind_param(stmt,bind)){
-		fprintf(stderr,"[ERROR] stmt bind param failed (%s)\n",mysql_stmt_error(stmt));
+		cerror(" stmt bind param failed (%s)\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 #ifdef SSCS_CLIENT_FORK
@@ -181,7 +179,7 @@ int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, 
 #endif
 	}
 	if(mysql_stmt_execute(stmt)){
-		fprintf(stderr,"[ERROR] stmt exec failed int checkforUser(): %s\n",mysql_stmt_error(stmt));
+		cerror(" stmt exec failed int checkforUser(): %s\n",mysql_stmt_error(stmt));
 		mysql_stmt_close(stmt);
 		mysql_close(db);
 #ifdef SSCS_CLIENT_FORK
@@ -207,7 +205,7 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 	
 	MYSQL_STMT* stmt = mysql_stmt_init(db);
 	if(!stmt){
-                fprintf(stderr,"[ERROR] Failed to initialize stmt -> addUser2DB\n");
+                cerror(" Failed to initialize stmt -> addUser2DB\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -217,7 +215,7 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         }
       char* statement = "INSERT INTO KNOWNUSERS VALUES(NULL,?,?,?,?,?)";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] stmt prepare failed (%s) -> addUser2DB \n",mysql_stmt_error(stmt));
+                cerror(" stmt prepare failed (%s) -> addUser2DB \n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -251,7 +249,7 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 	bind[4].buffer=hash->salt;
 	bind[4].buffer_length=hash->saltl;
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] binding stmt param (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
+                cerror(" binding stmt param (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -262,7 +260,7 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
         }
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] stmt exec failed (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
+                cerror(" stmt exec failed (%s) -> addUser2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -278,9 +276,7 @@ int addUser2DB(char* username,char* b64rsa,int rsalen,char* authkey,MYSQL* db){ 
 
 void ssc_sig_handler(int sig){ //Function to handle signals
 		if(sig == SIGINT || sig == SIGABRT || sig == SIGTERM){
-#ifdef DEBUG
-			fprintf(stdout,"\nCaught Signal... Exiting\n");
-#endif /* DEBUG */
+			cdebug("\nCaught Signal... Exiting\n");
 			close(sock);
 			exit(EXIT_SUCCESS);
 		}
@@ -307,7 +303,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         MYSQL_STMT* stmt;
         stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->getUserUID\n");
+                cerror(" mysql_stmt_init out of mem ->getUserUID\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -317,7 +313,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         }
         char* statement = "SELECT UID FROM KNOWNUSERS WHERE USERNAME = ?";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_prepare() error (%s) -> getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -333,7 +329,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_param err (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -349,7 +345,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         result[0].buffer=&usruid;
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_execute err (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -360,7 +356,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -371,7 +367,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_store_result() err(%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -382,7 +378,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
         }
 
         if(mysql_stmt_fetch(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_fetch() error / maybe user is not in db (%s)->getUserUID\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_fetch() error / maybe user is not in db (%s)->getUserUID\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return -1;
         }
@@ -396,7 +392,7 @@ int getUserUID(char* username,MYSQL *db){ //gets uid for the username it is pass
 int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a message to the database, returns 1 on success, 0 on error
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem->addMsg2DB\n");
+                cerror(" mysql_stmt_init out of mem->addMsg2DB\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -406,7 +402,7 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
         }
         char* statement = "INSERT INTO MESSAGES VALUES(NULL,?,?)";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare err (%s)->addMsg2DB\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_prepare err (%s)->addMsg2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -426,7 +422,7 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
         bind[1].buffer=message;
         bind[1].buffer_length=(size_t)strlen((const char*)message);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->AddMSG2DB\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_param err (%s)->AddMSG2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -437,7 +433,7 @@ int AddMSG2DB(MYSQL* db,char* recipient,unsigned char* message){ //Adds a messag
         }
         //printf("Username %s , %i with msg %s\n",recipient,recvuid,message);
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute() err (%s)->addMSG2DB\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_execute() err (%s)->addMSG2DB\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -459,7 +455,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         if( newline ) *newline = 0;
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->GetEncodedRSA\n");
+                cerror(" mysql_stmt_init out of mem ->GetEncodedRSA\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -469,7 +465,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         }
         char* statement = "SELECT RSAPUB64,RSALEN FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_prepare() error (%s) -> GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -484,7 +480,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_param err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -505,7 +501,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         result[1].buffer=&rsalen;
 
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_execute err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -516,7 +512,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -527,7 +523,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_store_result() err(%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -538,7 +534,7 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         }
         int mysql_fetch_rv = mysql_stmt_fetch(stmt);
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_fetch err (%s)->GetEncodedRSA\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
@@ -551,14 +547,10 @@ const char* GetEncodedRSA(char* username, MYSQL* db){ //Functions that returns a
         }
         else{
                 mysql_stmt_close(stmt);
-#ifdef DEBUG
-               fprintf(stderr,"[ERROR] rsapub64_len <= 0,maybe user \"%s\" does not exist?->GetEncodedRSA\n",username);
-#endif /* DEBUG */
+               cdebug(" rsapub64_len <= 0,maybe user \"%s\" does not exist?->GetEncodedRSA\n",username);
                 return NULL;
         }
-#ifdef DEBUG
-        fprintf(stdout,"Length returned by GetEncodedRSA is %i->>%s)\n",(int)rsalen,rsapub64);
-#endif /* DEBUG */
+        cdebug("Length returned by GetEncodedRSA is %i->>%s)\n",(int)rsalen,rsapub64);
         int messagep = GETRSA_RSP;
         sscso* obj = SSCS_object();
         SSCS_object_add_data(obj,"msgp",(byte*)&messagep,sizeof(int));
@@ -576,7 +568,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         int usruid = getUserUID(username,db);
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->GetUserMessagesSRV\n");
+                cerror(" mysql_stmt_init out of mem ->GetUserMessagesSRV\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -586,7 +578,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         }
         char* statement = "SELECT MESSAGE FROM MESSAGES WHERE RECVUID = ?";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_prepare err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -601,7 +593,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         bind[0].buffer=&usruid;
         bind[0].buffer_length=sizeof(int);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_param err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -611,7 +603,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
 #endif
         }
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_execute err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -626,7 +618,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
         result[0].buffer_type=MYSQL_TYPE_STRING;
         result[0].length=&msglength;
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -636,7 +628,7 @@ char* GetUserMessagesSRV(char* username,MYSQL* db){ //Returns buffer with encode
 #endif
         }
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_store_result() err(%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -657,7 +649,7 @@ while(1){
         }
 
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_fetch err (%s)->GetUserMessagesSRV\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
@@ -685,7 +677,7 @@ while(1){
         MYSQL_STMT *stmt2 = mysql_stmt_init(db);
         char* statement2 = "DELETE FROM MESSAGES WHERE RECVUID = ?";
         if(mysql_stmt_prepare(stmt2,statement2,strlen(statement2))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare2 err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                cerror(" mysql_stmt_prepare2 err (%s) ->GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -700,7 +692,7 @@ while(1){
         bind2[0].buffer=&usruid;
         bind2[0].buffer_length=sizeof(int);
         if(mysql_stmt_bind_param(stmt2,bind2)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                cerror(" mysql_stmt_bind_param2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
                 cfree(retptr);
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
@@ -711,7 +703,7 @@ while(1){
 #endif
         }
         if(mysql_stmt_execute(stmt2)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
+                cerror(" mysql_stmt_execute2 err (%s) -> GetUserMessagesSRV\n",mysql_stmt_error(stmt2));
                 cfree(retptr);
                 mysql_stmt_close(stmt2);
                 mysql_close(db);
@@ -738,7 +730,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         if( newline ) *newline = 0;
         MYSQL_STMT* stmt = mysql_stmt_init(db);
         if(!stmt){
-                fprintf(stderr,"[ERROR] mysql_stmt_init out of mem ->getUserAuthKeyHash\n");
+                cerror(" mysql_stmt_init out of mem ->getUserAuthKeyHash\n");
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
 	exit(1);
@@ -748,7 +740,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         }
         char* statement = "SELECT SHA256,SALT FROM KNOWNUSERS WHERE USERNAME = ? LIMIT 1";
         if(mysql_stmt_prepare(stmt,statement,strlen(statement))){
-                fprintf(stderr,"[ERROR] mysql_stmt_prepare() error (%s) -> getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_prepare() error (%s) -> getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -763,7 +755,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         bind[0].buffer=username;
         bind[0].buffer_length=strlen(username);
         if(mysql_stmt_bind_param(stmt,bind)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_param err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_param err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -784,7 +776,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
 	result[1].buffer_type=MYSQL_TYPE_STRING;
 	result[1].length=&salt_len;
         if(mysql_stmt_execute(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_execute err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_execute err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -795,7 +787,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         }
 
         if(mysql_stmt_bind_result(stmt,result)){
-                fprintf(stderr,"[ERROR] mysql_stmt_bind_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_bind_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -806,7 +798,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         }
 
         if(mysql_stmt_store_result(stmt)){
-                fprintf(stderr,"[ERROR] mysql_stmt_store_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_store_result() err(%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 mysql_close(db);
                 #ifdef SSCS_CLIENT_FORK
@@ -817,7 +809,7 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
         }
         int mysql_fetch_rv = mysql_stmt_fetch(stmt);
         if(mysql_fetch_rv && !(mysql_fetch_rv == MYSQL_DATA_TRUNCATED)){ //if error occurred and it was NOT MYSQL_DATA_TRUNCATED
-                fprintf(stderr,"[ERROR] mysql_stmt_fetch err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
+                cerror(" mysql_stmt_fetch err (%s)->getUserAuthKeyHash\n",mysql_stmt_error(stmt));
                 mysql_stmt_close(stmt);
                 return NULL;
         }
@@ -839,11 +831,8 @@ SSCS_HASH* getUserAuthKeyHash(char* username, MYSQL* db){
 	retstruct->hashl=authkey_len;
 	retstruct->salt=(byte*)salt;
 	retstruct->saltl=salt_len;
-#ifdef DEBUG
-	fprintf(stdout,"[DEBUG] Salt is ");
-	fprintf(stdout,"%s\n",salt);
-	
-#endif /* DEBUG */
+	cdebug("Salt is %s\n",salt);
+
 	return retstruct;
 } /* getUserAuthKeyHash */
 

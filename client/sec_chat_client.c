@@ -24,6 +24,8 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
@@ -63,19 +65,31 @@ gboolean timedupdate_gui(void* data){
 
 #define UNUSED(x)((void)x)
 
-typedef unsigned char byte;
-
-int pexit(char* error){
-	fprintf(stderr,"[ERROR] Exiting, error : %s\n",error);
+int pexit(byte* error){
+	fprintf(stderr,"[ERROR] %s\n",error);
 	exit(EXIT_FAILURE);
 }
 
-//Startpoint
+/*
+ * Start of client 
+ */
 int main(void){
-	fprintf(stdout,"[INFO] Starting secure chat application...\n");
-	fprintf(stdout,"[INFO] Get the source at: ('https://github.com/kping0/simplesecurechat/client')\n");
-	fprintf(stdout,"[INFO] Host your own server with ('https://github.com/kping0/simplesecurechat/server')\n");
-	//Setup SSL Connection
+	fprintf(stdout,"[INFO] Starting secure chat application...\n[INFO] Get the source at: ('https://github.com/kping0/simplesecurechat/client')\n[INFO] Host your own server with ('https://github.com/kping0/simplesecurechat/server')\n");
+/*
+	char* home_dir = secure_getenv("HOME");
+	char* data_dir = calloc(1,strlen(home_dir) + 17);
+	sprintf(data_dir,"%s/.ssc_personal/",home_dir);
+	if(mkdir(data_dir, S_IRUSR | S_IWUSR | S_IXUSR) && errno != EEXIST){
+		fprintf(stderr,"[ERROR] Could not create ~/.ssc_personal/ (errno == %d)\n",errno);
+		exit(EXIT_FAILURE);
+	}
+*/
+	/*  Init OpenSSL Library */
+	(void)SSL_library_init(); 
+	SSL_load_error_strings(); 
+	init_locks(); /* enable OpenSSL thread-safety (via pthread_mutexes) */
+
+	/* Connect to server */
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(tls_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
 		fprintf(stdout,"[INFO] SSL/TLS OK\n");
@@ -87,9 +101,10 @@ int main(void){
 		free(tls_vars);
 		exit(1);
 	}
-	init_locks(); //add locks for openssl
-	//Load Keypair From Disk
-	EVP_PKEY* pubk_evp = EVP_PKEY_new();
+	/*
+	 * Load Public & Private Keys
+	 */
+	EVP_PKEY* pubk_evp = EVP_PKEY_new(); 
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
 	if(!load_keypair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
 		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
@@ -121,13 +136,13 @@ int main(void){
 	const byte msg[] = "This is a secret message";
 	byte *sig = NULL;
 	size_t slen = 0;
-	int rc = signmsg(msg,sizeof(msg),&sig,&slen,priv_evp);
+	int rc = sign_msg(msg,sizeof(msg),&sig,&slen,priv_evp);
 	if(rc == 0) {
        		 fprintf(stdout,"[INFO] Created signature\n");
     	} else {
        		 fprintf(stderr,"[ERROR] Failed to create signature, return code %d\n", rc);
    	}
-	rc = verifymsg(msg,sizeof(msg),sig,slen,pubk_evp);
+	rc = verify_msg(msg,sizeof(msg),sig,slen,pubk_evp);
 	if(rc == 0){
 		fprintf(stdout,"[INFO] Verified Signature");
 	}	
@@ -139,22 +154,22 @@ int main(void){
 //register your user
 
 	fprintf(stdout,"[INFO] Your username is: %s, trying to register it with the server\n",get_muser(db));
-	char* regubuf = (char*)register_user_str(db);
-	assert(regubuf != NULL && strlen(regubuf) > 0);
-	BIO_write(tls_vars->bio_obj,regubuf,strlen(regubuf)); 
-	char rsp[3];
+	byte* regubuf = (byte*)register_user_str(db);
+	assert(regubuf != NULL && strlen((const char*)regubuf) > 0);
+	BIO_write(tls_vars->bio_obj,regubuf,strlen((const char*)regubuf)); 
+	byte rsp[3];
 	memset(rsp,0,3);			
 	BIO_read(tls_vars->bio_obj,rsp,3);
-	if(strncmp(rsp,"ERR",3) == 0){
+	if(strncmp((const char*)rsp,"ERR",3) == 0){
 		fprintf(stderr,"[ERROR] Failed to register user, maybe user exits on server side ?\n");
 	}
 	free(regubuf);
 
 //Authenticate USER
-	char* authmsg = auth_usr(db);
+	byte* authmsg = auth_usr(db);
 	fprintf(stdout,"[INFO] Trying to authenticate your user\n");
-	assert(authmsg != NULL && strlen(authmsg) > 0);
-	BIO_write(tls_vars->bio_obj,authmsg,strlen(authmsg));
+	assert(authmsg != NULL && strlen((const char*)authmsg) > 0);
+	BIO_write(tls_vars->bio_obj,authmsg,strlen((const char*)authmsg));
 	free(authmsg);
 
 /*
@@ -194,7 +209,7 @@ int main(void){
 		widgetsobj->chatpartnerlabel = (GtkLabel*)chatpartnerlabel;
 		widgetsobj->recvlist = recvlist;
 		widgetsobj->backend_vars = backend_vars;
-		char* username = NULL;
+		byte* username = NULL;
 		widgetsobj->current_username = &username;
 		g_object_unref(G_OBJECT(gtkBuilder));
 		/* Connect signals to the handlers for sending messages & adding users */
@@ -227,25 +242,25 @@ int main(void){
 	attroff(COLOR_PAIR(1));
 	attron(A_BOLD);
 	attron(COLOR_PAIR(2));
-	ssc_cli_add_item(help_window,"--- SIMPLESECURECHAT HELP ---");
+	ssc_cli_add_item(help_window,(byte*)"--- SIMPLESECURECHAT HELP ---");
 	attroff(A_BOLD);
-	ssc_cli_add_item(help_window,"This UI has vim style controls. ");
-	ssc_cli_add_item(help_window,"To switch between columns, use 'h' , 'l' , [TAB] or R/L arrow");
-	ssc_cli_add_item(help_window,"To go down a column, use 'j' or the down arrow.");
-	ssc_cli_add_item(help_window,"To go up a column, use 'k' or the up arrow.");
-	ssc_cli_add_item(help_window,"To quit, hit 'q'");
+	ssc_cli_add_item(help_window,(byte*)"This UI has vim style controls. ");
+	ssc_cli_add_item(help_window,(byte*)"To switch between columns, use 'h' , 'l' , [TAB] or R/L arrow");
+	ssc_cli_add_item(help_window,(byte*)"To go down a column, use 'j' or the down arrow.");
+	ssc_cli_add_item(help_window,(byte*)"To go up a column, use 'k' or the up arrow.");
+	ssc_cli_add_item(help_window,(byte*)"To quit, hit 'q'");
 	attron(A_BOLD);
-	ssc_cli_add_item(help_window," ");
-	ssc_cli_add_item(help_window,"--- COMMANDS ---");
+	ssc_cli_add_item(help_window,(byte*)" ");
+	ssc_cli_add_item(help_window,(byte*)"--- COMMANDS ---");
 	attroff(A_BOLD);
-	ssc_cli_add_item(help_window,"To enter a command, hit ':' .");
-	ssc_cli_add_item(help_window,"Commands can be used for many things, like: ");
-	ssc_cli_add_item(help_window,"Sending messages ':send username message'");
-	ssc_cli_add_item(help_window,"Adding friends ':add username'");
-	ssc_cli_add_item(help_window,"Switching users ':switch username'");
-	ssc_cli_add_item(help_window,"Deleting users ':delete username' ");
-	ssc_cli_add_item(help_window," ");
-	ssc_cli_add_item(help_window,"Hit [ENTER] to begin");
+	ssc_cli_add_item(help_window,(byte*)"To enter a command, hit ':' .");
+	ssc_cli_add_item(help_window,(byte*)"Commands can be used for many things, like: ");
+	ssc_cli_add_item(help_window,(byte*)"Sending messages ':send username message'");
+	ssc_cli_add_item(help_window,(byte*)"Adding friends ':add username'");
+	ssc_cli_add_item(help_window,(byte*)"Switching users ':switch username'");
+	ssc_cli_add_item(help_window,(byte*)"Deleting users ':delete username' ");
+	ssc_cli_add_item(help_window,(byte*)" ");
+	ssc_cli_add_item(help_window,(byte*)"Hit [ENTER] to begin");
 	(void)getch(); //Wait for userinput
 	ssc_cli_cust_updwin(help_window,FALSE); //delete the window
 	attron(A_BOLD);
@@ -293,7 +308,7 @@ int main(void){
 	int current_panel = 1;
 	int ch,i,x,y;
 	ch = i = x = y = 0;
-	char* usrcmd;
+	byte* usrcmd;
 
 	gv->conn = tls_vars->bio_obj;
 	gv->db = db;
@@ -322,6 +337,7 @@ int main(void){
 				free(usrcmd); //free userinput
 				halfdelay(5); //switch back into halfdelay
 				break;
+			case KEY_DOWN:
 			case 'j': //go down
 				//Calculate the next curor position (y = y+2)
 				getyx(stdscr,y,x);
@@ -343,6 +359,7 @@ int main(void){
 					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				}
 				break;
+			case KEY_UP:
 			case 'k': //go up 
 				// Calculate the next cursor position (y = y-2)
 				getyx(stdscr,y,x);
@@ -364,9 +381,31 @@ int main(void){
 					ssc_cli_window_upd_highlight(gv); //highlight the appropriate item in the list (based on the cursor position)
 				}			
 				break;
+			case 'h':
+			case KEY_LEFT: //tab (Switch to the next window)
+				current_panel--;
+				if(current_panel == -1)current_panel = 3;
+				if(current_panel == 1){ //User is in the contacts window
+					gv->current = gv->contacts;
+					gv->previous = gv->sent;
+				}
+				if(current_panel == 2){ // User is in the received window
+					gv->current = gv->received;
+					gv->previous = gv->contacts;
+				}
+				if(current_panel == 3){ //User is in the sent window
+					gv->current = gv->sent;
+					gv->previous = gv->received;
+				}
+				if(gv->previous != gv->contacts)ssc_cli_window_reload(gv->previous); //reload the previous window (to get rid of the highlighted item) if previous != contacts
+				ssc_cli_switch_current(gv->current); //update the cursor
+				ssc_cli_window_upd_highlight(gv); //update the highlighted item 
+				break;
+			case KEY_RIGHT:
+			case 'l':
 			case 9: //tab (Switch to the next window)
 				current_panel++;
-				if((current_panel % 4) == 0)current_panel = 1; //if tab is hit on the last panel, return to the first panel
+				if(current_panel == 4)current_panel = 1; //if tab is hit on the last panel, return to the first panel
 				if(current_panel == 1){ //User is in the contacts window
 					gv->current = gv->contacts;
 					gv->previous = gv->sent;

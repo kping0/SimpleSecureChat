@@ -18,11 +18,10 @@
 # *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # */
 
-#Security flags for compiling
 security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now -lpthread
 
-SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o
-	gcc $(security_flags) -o SSCServer base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o `mysql_config --cflags --libs` -lcrypto -lssl
+SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o cstdinfo.o
+	gcc $(security_flags) -o SSCServer base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o cstdinfo.o  `mysql_config --cflags --libs` -lcrypto -lssl
 	rm -f *.o
 main.o: secure_chat_server.c
 	gcc $(security_flags) -o main.o -c secure_chat_server.c `mysql_config --cflags --libs` -lcrypto -lssl
@@ -43,6 +42,9 @@ hashing.o: headers/hashing.c headers/hashing.h
 
 protected_malloc.o: headers/protected_malloc.c headers/protected_malloc.h
 	gcc $(security_flags) -o protected_malloc.o -c headers/protected_malloc.c
+
+cstdinfo.o: headers/cstdinfo.c headers/cstdinfo.h
+	gcc $(security_flags) -o cstdinfo.o -c headers/cstdinfo.c
 
 clean:
 	rm -f *.o SSCServer* temp 

@@ -36,14 +36,6 @@
 int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ //return 1 on success, 0 on error
 
 	long chkv = 1; /*Variable for error checking*/
-
-	/*
-	* Init OpenSSL Library
-	*/
-	
-	(void)SSL_library_init(); 
-	SSL_load_error_strings(); 
-
 	/*
 	*Create Variables Used By OpenSSL
 	*/

@@ -42,7 +42,7 @@
 #include <time.h>
 #include <pthread.h>
 #include "settings.h"
-
+#include "cstdinfo.h"
 
 #ifndef PAGESIZE /* Usually defined in limits.h */
 #define PAGESIZE 4096

@@ -16,19 +16,23 @@
 # *  You should have received a copy of the GNU General Public License
 # *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # */
+
 debug_flags = -O0 -g3 
 
 security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now
 
-flags = $(security_flags) -std=c99 -lpthread -D_POSIX_C_SOURCE=199309L -DSQLITE_THREADSAFE=1
+no_warning_flags = -Wno-unused-function -Wno-pointer-sign -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-result #get rid of annoying warnings
 
+flags = $(security_flags) $(no_warning_flags) -std=c99 -lpthread -D_POSIX_C_SOURCE=199309L -DSQLITE_THREADSAFE=1 -D_GNU_SOURCE
 gui_flags = -DSSC_GUI `pkg-config --cflags gtk+-3.0` `pkg-config --cflags glib-2.0` `pkg-config --libs gtk+-3.0` `pkg-config --libs glib-2.0`
 
-gui: all gui.o sec_chat_client.c 
+all = sscssl.o sscasymmetric.o sscdbfunc.o base64.o serialization.o msgfunc.o cli.o cstdinfo.o 
+
+gui: $(all) gui.o sec_chat_client.c 
+	rm -f SSCClient*
 	gcc $(flags) $(gui_flags) -o main.o -c sec_chat_client.c -lssl -lcrypto -lsqlite3  
-	gcc $(flags) $(gui_flags) -o SSCClient gui.o cli.o main.o msgfunc.o sscdbfunc.o sscasymmetric.o sscssl.o base64.o serialization.o -lssl -lcrypto -lsqlite3 -lpanel -lncurses
+	gcc $(flags) $(gui_flags) -o SSCClient gui.o main.o $(all) -lssl -lcrypto -lsqlite3 -lpanel -lncurses
 	rm -f *.o
-all: sscssl.o sscasymmetric.o sscdbfunc.o base64.o serialization.o msgfunc.o cli.o
 sscssl.o: headers/sscssl.c headers/sscssl.h
 	gcc $(flags) -o sscssl.o -c headers/sscssl.c -lssl -lcrypto
 sscasymmetric.o: headers/sscasymmetric.c headers/sscasymmetric.h
@@ -45,11 +49,13 @@ cli.o: headers/cli.c headers/cli.h
 	gcc $(flags) -lpanel -lncurses -c headers/cli.c -o cli.o 
 msgfunc.o: headers/msgfunc.c headers/msgfunc.h
 	gcc $(flags) -o msgfunc.o -c headers/msgfunc.c -lsqlite3 -lcrypto -lssl
+cstdinfo.o: headers/cstdinfo.c headers/cstdinfo.h
+	gcc $(flags) -o cstdinfo.o -c headers/cstdinfo.c
 clean:	
 	rm -f *.o SSCClient* sscdb.db rsapublickey.pem rsaprivatekey.pem
-cli: all 
+cli: $(all) 
 	gcc $(flags) -o main.o -c sec_chat_client.c -lssl -lcrypto -lsqlite3 
-	gcc $(flags) -o SSCClient_cli main.o cli.o sscdbfunc.o msgfunc.o sscasymmetric.o sscssl.o base64.o serialization.o -lssl -lcrypto -lsqlite3 -lpanel -lncurses
+	gcc $(flags) -o SSCClient_cli main.o $(all) -lssl -lcrypto -lsqlite3 -lpanel -lncurses
 	rm -f *.o
 gitprep: clean 
 	rm -f public.pem README.md ../README.md

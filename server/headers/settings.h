@@ -25,7 +25,7 @@
 */
 
 /* Miscellaneous */
-#define DEBUG //uncomment for additional debug info
+//#define DEBUG //uncomment for additional debug info
 #define SSC_VERIFY_VARIABLES //sanity check variables 
 
 /* Settings for MySQL/MariaDB */
@@ -34,7 +34,7 @@
 #define SSCDB_PASS "passphrase" //mysql password 
 
 /* Log Settings */
-//#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
+#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
 #define SSCS_LOGFILE "SSCServer.log" //Logfile to write to 
 
 /* Certificate file Settings */
@@ -51,7 +51,7 @@
  * Security -> Use Custom Malloc
  */
 
-//#define SSCS_CUSTOM_MALLOC /* comment out to use the system specific malloc & free */
+#define SSCS_CUSTOM_MALLOC /* comment out to use the system specific malloc & free */
 
 #ifdef SSCS_CUSTOM_MALLOC
 	#include "protected_malloc.h"
@@ -67,13 +67,5 @@
  * threading (Same memory space, new stack -> Better Performance)
  */
 //#define SSCS_CLIENT_FORK
-#define SSCS_CLIENT_THREAD
-
-#if defined SSCS_CLIENT_FORK && defined SSCS_CLIENT_THREAD
-#error [ERROR] (settings.h) You cannot fork and thread at the same time 
-#endif
-#if  !(defined SSCS_CLIENT_FORK || defined SSCS_CLIENT_THREAD)
-#error [ERROR] (settings.h) You must either fork or thread
-#endif
 
 #endif /* SSC_SETTINGSHFSRV */

@@ -24,11 +24,13 @@
 #ifndef SSC_SETTINGSHF
 #define SSC_SETTINGSHF
 
+typedef unsigned char byte;
+
 /* Uncomment below for debug information */
 //#define DEBUG 
 
 /* Comment out if you want to use your own server */
-#define _USE_DEFAULT_SERVER
+//#define _USE_DEFAULT_SERVER
 
 #ifdef _USE_DEFAULT_SERVER
 	#include "../default/default_server.h"

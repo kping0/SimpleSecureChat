@@ -44,6 +44,7 @@
 #include <mysql.h>
 
 #include "serialization.h"
+#include "cstdinfo.h"
 #include "settings.h"
 #include "base64.h"
 #include "hashing.h"
@@ -59,7 +60,6 @@
 #define REGRSA_RSP 7 //Server response to REGRSA
 #define GETRSA_RSP 8 //Server response to GETRSA
 #define AUTHUSR 9 //Sent from client to authenticate
-
 
 extern int sock;
 

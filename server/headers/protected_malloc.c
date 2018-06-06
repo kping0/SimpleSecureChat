@@ -27,8 +27,8 @@ void sscs_chkaddr(void* ptr,const char* file,int line){
 	byte* readpointer = (byte*)orig;	
 	int chv = *(int*)readpointer; readpointer+=4;
 	if(chv != SSCS_HEAP_MAGIC){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() header checksum error - Called from %s - line %d\n",file,line);
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
+		cerror(" sscs_chkaddr() header checksum error - Called from %s - line %d\n",file,line);
+		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
 		#ifdef SSCS_CLIENT_FORK
 	exit(1);
 #else
@@ -38,54 +38,29 @@ void sscs_chkaddr(void* ptr,const char* file,int line){
 	byte* rngbytes = readpointer; readpointer += 8;
 	size_t bufsize = *(size_t*)readpointer; readpointer += 8;
 	if(bufsize <= 0){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() bufsize <= 0 - Called from %s - line %d\n",file,line);
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		#ifdef SSCS_CLIENT_FORK
-	exit(1);
-#else
-	pthread_exit(NULL);
-#endif
+		cerror(" sscs_chkaddr() bufsize <= 0 - Called from %s - line %d\n",file,line);
+		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
 	}
 	if(*readpointer != 0x0){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() incorrect padding (!0x0) - Called from %s - line %d\n",file,line);
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		#ifdef SSCS_CLIENT_FORK
-	exit(1);
-#else
-	pthread_exit(NULL);
-#endif
+		cerror(" sscs_chkaddr() incorrect padding (!0x0) - Called from %s - line %d\n",file,line);
+		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
 	}	
 	readpointer++;	
 	readpointer+=bufsize;	
 	if(*readpointer != 0x0){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() (tail) incorrect padding - Called from %s - line %d\n",file,line);
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		#ifdef SSCS_CLIENT_FORK
-	exit(1);
-#else
-	pthread_exit(NULL);
-#endif
+		cerror(" sscs_chkaddr() (tail) incorrect padding - Called from %s - line %d\n",file,line);
+		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
 	}
 	readpointer++;
 	if(memcmp(rngbytes,readpointer,8)){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() (tail) header-tail rng doesnt match - Called from %s - line %d\n",file,line);	
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely, exiting\n",orig);
-		#ifdef SSCS_CLIENT_FORK
-	exit(1);
-#else
-	pthread_exit(NULL);
-#endif
+		cerror(" sscs_chkaddr() (tail) header-tail rng doesnt match - Called from %s - line %d\n",file,line);	
+		ccrit(" Heap Overflow at address %p likely, exiting\n",orig);
 	}
 	readpointer+=8;
 	chv = *(int*)readpointer;
 	if(chv != SSCS_HEAP_MAGIC){
-		fprintf(stderr,"[ERROR] sscs_chkaddr() tail checksum error - Called from %s - line %d\n",file,line);
-		fprintf(stderr,"[SECURITY_WARNING] Heap Overflow at address %p likely,exiting \n",orig);
-		#ifdef SSCS_CLIENT_FORK
-	exit(1);
-#else
-	pthread_exit(NULL);
-#endif	
+		cerror(" sscs_chkaddr() tail checksum error - Called from %s - line %d\n",file,line);
+		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
 	}
 	return;	
 }
@@ -147,9 +122,7 @@ unsigned char *gen_rdm_bytestream (size_t num_bytes){  //generate semi-random by
  * Allocate Buffer 
  */
 void* sscs_cmalloc(size_t size,const char* file, int line){
-#ifdef DEBUG
-	fprintf(stdout,"[DEBUG] Called sscs_cmalloc() (Called from %s-%d)\n",file,line);
-#endif
+	cdebug(" Called sscs_cmalloc() (Called from %s-%d)\n",file,line);
 	size_t origsize = size;
 /*
  * Calculate size to allocate (must be a multiple of PAGESIZE)
@@ -158,7 +131,7 @@ void* sscs_cmalloc(size_t size,const char* file, int line){
 	size_t alloc_len = size + PAGESIZE - (size % PAGESIZE) + PAGESIZE; //get next multiple of pagesize that fits size&metadata + guardpage length
 	char* buf = aligned_alloc(PAGESIZE,alloc_len);
 	if(!buf){
-		fprintf(stderr,"[ERROR] could not allocate aligned memory (called from %s line %d)\n",file,line);
+		cerror(" could not allocate aligned memory (called from %s line %d)\n",file,line);
 		return NULL;
 	}
 	memset(buf,0,alloc_len);
@@ -214,13 +187,9 @@ void* sscs_cmalloc(size_t size,const char* file, int line){
 }
 
 void sscs_cfree(void* ptr,const char* file,int line){
-#ifdef DEBUG
-	fprintf(stdout,"[DEBUG] Called sscs_cfree() (Called from %s-%d)\n",file,line);
-#endif
+	cdebug(" Called sscs_cfree() (Called from %s-%d)\n",file,line);
 	if(ptr == NULL){
-	#ifdef DEBUG
-		fprintf(stdout,"[DEBUG] ptr passed is NULL\n");
-	#endif
+		cdebug(" ptr passed is NULL\n");
 		return;
 	}
 	void* orig = ptr-21; //go back to original metasize buffer

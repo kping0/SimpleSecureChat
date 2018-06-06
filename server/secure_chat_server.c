@@ -46,6 +46,7 @@
 #include "headers/base64.h" //MIT base64 function (BSD LICENSE)
 #include "headers/serialization.h" //SSCS Library
 #include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
+#include "headers/cstdinfo.h" //custom error & info printing
 
 struct sscs_handler_data{
 	int client_socket;
@@ -62,6 +63,7 @@ int main(void){
 #ifdef SSCS_LOGTOFILE
     FILE* stdoutl = freopen(SSCS_LOGFILE,"a+",stdout);
     FILE* stderrl = freopen(SSCS_LOGFILE,"a+",stderr); 
+    cinitfd(stdoutl,stderrl);
 #endif /* SSCS_LOGTOFILE */
     //register signal handlers..
     signal(SIGINT,ssc_sig_handler);
@@ -88,13 +90,11 @@ int main(void){
         uint len = sizeof(addr);
 	
         int client = accept(sock, (struct sockaddr*)&addr, &len); //Accept Client Connections.
-#ifdef DEBUG
-	fprintf(stdout,"Info: Connection from: %s:%i\n",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
-#endif /* DEBUG */
+	cinfo("Connection from: %s:%i",inet_ntoa(addr.sin_addr),(int)ntohs(addr.sin_port));
 
 		struct sscs_handler_data* _hdl_data = cmalloc(sizeof(struct sscs_handler_data));
 		if(!_hdl_data){
-			fprintf(stderr,"[ERROR] Failed to allocate memory for thread_data\n");
+			cerror(" Failed to allocate memory for thread_data\n");
 			exit(0);
 		}
 
@@ -112,21 +112,18 @@ int main(void){
 			_ClientHandler(_hdl_data);
 		}
 
-	#endif /* SSCS_CLIENT_FORK */
-	#ifdef SSCS_CLIENT_THREAD
+	#else
 		pthread_t _thr_id;
 		if(pthread_create(&_thr_id,NULL,_ClientHandler,_hdl_data)){
-			fprintf(stderr,"[ERROR] failed to create thread  %s\n",strerror(errno));
+			cerror(" failed to create thread  %s\n",strerror(errno));
 			cfree(_hdl_data);
 			exit(0);
 		}
 
-	#endif /* SSCS_CLIENT_THREAD */	
+	#endif /* SSCS_CLIENT_FORK */	
 	} 
     //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
-#ifdef DEBUG
-    fprintf(stdout,"[DEBUG] Server Main Process is shutting down..\n");
-#endif
+    cdebug(" Server Main Process is shutting down..\n");
     close(sock);
     SSL_CTX_free(ctx);
     cleanup_openssl();
@@ -173,63 +170,53 @@ void* _ClientHandler(void* data){
 		    	}
 			sscso* obj0 = SSCS_open((byte*)buf);
 			int msgp0  = SSCS_object_int(obj0,"msgp");
-	#ifdef DEBUG
-			fprintf(stdout,"[DEBUG] Message arrived with message purpose %i\n",msgp0);
-	#endif
+			cdebug(" Message arrived with message purpose %i\n",msgp0);
 			if(msgp0 == REGRSA){ //User wants to register a username with a public key
 				char* rusername = (char*)SSCS_object_string(obj0,"rusername");
 				if(!rusername){
-					fprintf(stderr,"[ERROR] User wants to register but username not found in serialized object\n");
+					cerror(" User wants to register but username not found in serialized object\n");
 					goto end;
 				}
 				char* newline = strchr(rusername,'\n');
 				if( newline ) *newline = 0;
 	
 				if(checkforUser(rusername,db) == 1){
-					fprintf(stderr,"[ERROR] Cannot add user \"%s\"-> username already taken.\n",rusername);
+					cerror(" Cannot add user \"%s\"-> username already taken.\n",rusername);
 					SSL_write(ssl,"ERR",3);
 				}
 				else{
-	#ifdef DEBUG
-					fprintf(stdout,"[DEBUG] User \"%s\" is trying to register\n",rusername);
-	#endif
+					cdebug(" User \"%s\" is trying to register\n",rusername);
 					char* b64rsa = (char*)SSCS_object_string(obj0,"b64rsa");
 					int rsalen = SSCS_object_int(obj0,"rsalen");
 					char* authkey = (char*)SSCS_object_string(obj0,"authkey");
 					if(strlen(authkey) < 256) goto end;
 					if(addUser2DB(rusername,b64rsa,rsalen,authkey,db) != 1){
-						fprintf(stderr,"[ERROR] inserting user %s\n",rusername);
+						cerror(" inserting user %s\n",rusername);
 						SSL_write(ssl,"ERR",3);
 						goto end;
 					}
 					else{
-	#ifdef DEBUG
-						fprintf(stdout,"[DEBUG] User \"%s\" registered\n",rusername);	
-	#endif
+						cdebug(" User \"%s\" registered\n",rusername);	
 						SSL_write(ssl,"OK",2);
 						cfree(rusername);
 					}
 				}
 			}
 			else if(msgp0 == AUTHUSR){ //User wants to authenticate so he can receive messages.
-	#ifdef DEBUG
-				fprintf(stdout,"[DEBUG] User sent request to authenticate,handling...\n");
-	#endif
+				cdebug(" User sent request to authenticate,handling...\n");
 				char* userauthk = (char*)SSCS_object_string(obj0,"authkey");
 				if(strlen(userauthk) < 256){
-					fprintf(stderr,"[ERROR] Authkey supplied <256 (%i)\n",(int)strlen(userauthk));
+					cerror(" Authkey supplied <256 (%i)\n",(int)strlen(userauthk));
 					goto end;
 				}
 				char* authusername = (char*)SSCS_object_string(obj0,"username");
 				SSCS_HASH* hash = getUserAuthKeyHash(authusername,db);
 				if(!hash){
-					fprintf(stderr,"[ERROR] Authkey returned by getUserAuthKey is NULL, exiting\n");
+					cerror(" Authkey returned by getUserAuthKey is NULL, exiting\n");
 					goto end;
 				}
 				if(SSCS_comparehash((byte*)userauthk,strlen(userauthk),hash) == SSCS_HASH_VALID){
-	#ifdef DEBUG
-					fprintf(stdout,"[DEBUG] User \"%s\" authenticated.\n",authusername);
-	#endif /* DEBUG */
+					cdebug(" User \"%s\" authenticated.\n",authusername);
 					SSCS_release(&obj0);
 					SSCS_freehash(&hash);
 	/*
@@ -253,14 +240,10 @@ void* _ClientHandler(void* data){
 						* Important Functions are only accessible when user has authenticated.
 						*/
 						if(msgp == GETRSA){ //Client is requesting a User Public Key
-	#ifdef DEBUG
-							fprintf(stdout,"[DEBUG] Client Requested Public Key,handling...\n");
-	#endif /* DEBUG */
+							cdebug(" Client Requested Public Key,handling...\n");
 							char* rsausername = (char*)SSCS_object_string(obj,"username");
 							const char* uRSAenc = GetEncodedRSA(rsausername,db);
-	#ifdef DEBUG
-							fprintf(stdout,"[DEBUG] Sending buffer \"%s\"\n",uRSAenc);
-	#endif /* DEBUG */
+							cdebug(" Sending buffer \"%s\"\n",uRSAenc);
 							if(uRSAenc){
 								SSL_write(ssl,uRSAenc,strlen(uRSAenc));	
 								cfree((void*)uRSAenc);
@@ -268,14 +251,10 @@ void* _ClientHandler(void* data){
 							cfree(rsausername);
 						}
 						else if(msgp == MSGREC){ //Client is requesting stored messages
-	#ifdef DEBUG
-							fprintf(stdout,"[DEBUG] Client Requesting New Messages, handling...\n");
-	#endif /* DEBUG */
+							cdebug(" Client Requesting New Messages, handling...\n");
 							char* retmsg = GetUserMessagesSRV(authusername,db);
-	#ifdef DEBUG
-							fprintf(stdout,"[DEBUG] msg is %s\n",retmsg);
-							fprintf(stdout,"[DEBUG] Length of messages returned is %d\n",(int)strlen(retmsg));
-	#endif /* DEBUG */
+							cdebug(" msg is %s\n",retmsg);
+							cdebug(" Length of messages returned is %d\n",(int)strlen(retmsg));
 							if(strlen(retmsg) != 0){ 
 								SSL_write(ssl,retmsg,strlen(retmsg));
 							}
@@ -288,7 +267,7 @@ void* _ClientHandler(void* data){
 							char* recipient = NULL;
 							recipient = (char*)SSCS_object_string(obj,"recipient");
 							if(!recipient){
-							fprintf(stderr,"[ERROR] Recipient for message not specified,exiting\n");
+							cerror(" Recipient for message not specified,exiting\n");
 							goto end;
 							}
 							if(SSCS_object_string(obj,"sender") != NULL)goto end;
@@ -296,11 +275,9 @@ void* _ClientHandler(void* data){
 							char* newline = strchr(recipient,'\n');
 							if( newline ) *newline = 0;
 							char* b64modbuf = obj->buf_ptr;
-	#ifdef DEBUG
-							fprintf(stdout,"[DEBUG] buffering message from %s to %s\n",authusername,recipient);
-	#endif /* DEBUG */
+							cdebug(" buffering message from %s to %s\n",authusername,recipient);
 							if(AddMSG2DB(db,recipient,(unsigned char*)b64modbuf) == -1){
-								fprintf(stderr,"[ERROR] Error occurred adding MSG to Database\n");
+								cerror(" Error occurred adding MSG to Database\n");
 							}				
 						}
 						SSCS_release(&obj);
@@ -311,12 +288,12 @@ void* _ClientHandler(void* data){
 					}
 				}
 				else{
-					fprintf(stderr,"[ERROR] User %s failed to authenticate.\n",authusername);
+					cerror(" User %s failed to authenticate.\n",authusername);
 					SSCS_freehash(&hash);
 				}	
 			}
 			else{
-				fprintf(stderr,"[ERROR] ? Message received with no specific purpose, exiting...\n");
+				cerror(" ? Message received with no specific purpose, exiting...\n");
 				SSCS_release(&obj0);
 				goto end;
 			}
@@ -327,9 +304,7 @@ void* _ClientHandler(void* data){
 #endif /* SSCS_LOGTOFILE */
 		}
 	end: //cleanup & exit
-	#ifdef DEBUG
-		fprintf(stdout,"[DEBUG] Ending Client Session\n");
-	#endif /* DEBUG */
+		cdebug(" Ending Client Session\n");
 		BIO_free(bio);
 		SSL_free(ssl);
 		close(client); 

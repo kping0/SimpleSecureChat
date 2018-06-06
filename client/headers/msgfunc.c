@@ -19,13 +19,13 @@
 
 #include "msgfunc.h"
 
-const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
-	if(strlen((const char*)message) > 1024){
+byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+	if(strlen((byte*)message) > 1024){
 		fprintf(stderr,"Message too long(limit 1024)\n");
 		return NULL;	
 	}
 	sscso* obj = SSCS_object();
-	SSCS_object_add_data(obj,"recipient",(byte*)username,strlen((const char*)username));
+	SSCS_object_add_data(obj,"recipient",(byte*)username,strlen((byte*)username));
 	EVP_PKEY* userpubk = get_pubk_username(username,db);
 	if(userpubk == NULL){
 		fprintf(stderr,"Could not get Users Public Key, maybe not in DB?\n");
@@ -34,22 +34,22 @@ const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingK
 		return NULL;
 	}
 	
-	unsigned char* ek = malloc(EVP_PKEY_size(userpubk));
+	byte* ek = malloc(EVP_PKEY_size(userpubk));
 	int ekl = EVP_PKEY_size(userpubk); 
 
-	unsigned char* iv = malloc(EVP_MAX_IV_LENGTH);
+	byte* iv = malloc(EVP_MAX_IV_LENGTH);
 	RAND_poll();  
 	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
 		fprintf(stderr,"Error getting CS-RNG for IV\n");	
 		return NULL;	
 	}
 	RAND_poll();
-	unsigned char*enc_buf = malloc(2000);
+	byte*enc_buf = malloc(2000);
 	//A Way to impliment the sign-then-encrypt with good context protection
 
 	sscso* sigmsg = SSCS_object();
-	SSCS_object_add_data(sigmsg,"msg",(byte*)message,strlen((const char*)message));
-	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen((const char*)username));
+	SSCS_object_add_data(sigmsg,"msg",(byte*)message,strlen((byte*)message));
+	SSCS_object_add_data(sigmsg,"recipient",(byte*)username,strlen((byte*)username));
 	byte *sig = NULL;
 	size_t sigl = 0;
 	int rc = sign_msg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
@@ -78,7 +78,7 @@ const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingK
 	SSCS_object_add_data(obj,"ek",(byte*)ek,ekl);
 	SSCS_object_add_data(obj,"enc_buf",enc_buf,enc_len);
 	SSCS_object_add_data(obj,"iv",iv,EVP_MAX_IV_LENGTH);
-	const char* retptr = SSCS_object_encoded(obj);
+	byte* retptr = SSCS_object_encoded(obj);
 	//cleanup memory
 	SSCS_release(&obj);
 	SSCS_release(&sigmsg);
@@ -92,7 +92,7 @@ const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingK
 }
 
 	
-const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
+byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
 	if(encrypted_buffer == NULL){
 		fprintf(stderr,"Error decrypting\n");
 		return NULL;	
@@ -110,7 +110,7 @@ const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* 
 	if(!iv_data)return NULL;
 	byte* iv = iv_data->data;
 
-	unsigned char* dec_buf = malloc(2000);
+	byte* dec_buf = malloc(2000);
 	memset(dec_buf,0,2000);
 	
 	int dec_len = envelope_open(privKey,enc_buf,enc_len,ek,ekl,iv,dec_buf);
@@ -122,7 +122,7 @@ const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* 
 	int serializedobj3l = serializedobj3_data->len;
 	sscso* obj3 = SSCS_open(serializedobj3);
 
-	char* sender = (char*)SSCS_object_string(obj,"sender");
+	byte* sender = (byte*)SSCS_object_string(obj,"sender");
 	EVP_PKEY *userpubk = get_pubk_username(sender,db);
 	if(!userpubk){
 		fprintf(stderr,"error retrieving public key for %s",sender);	
@@ -167,7 +167,7 @@ const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* 
 		return NULL;
 	}
 
-	char* f_buf = (char*)SSCS_object_string(obj3,"msg");
+	byte* f_buf = (byte*)SSCS_object_string(obj3,"msg");
 
 	SSCS_release(&obj);
 	SSCS_release(&obj2);
@@ -181,7 +181,7 @@ const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* 
 	EVP_PKEY_free(userpubk);
 	
 	
-	return (const char*)f_buf;
+	return (byte*)f_buf;
 
 }
 /*

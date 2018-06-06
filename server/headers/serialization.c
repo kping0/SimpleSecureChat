@@ -209,7 +209,6 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	int i = 0;
 	byte* readpointer = memseq(buf_ptr,allocated,(byte*)label,label_len);
 	if(readpointer == NULL){
-		//printf("Label Not Found %s\n",label);
 		return NULL;
 	}
 	readpointer+=label_len;

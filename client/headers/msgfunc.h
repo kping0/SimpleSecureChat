@@ -55,8 +55,8 @@ int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* p
 
 int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey); //Verifies message "msg" with length of "mlen" with signature "sig" and public key "pkey"
 
-const char* encrypt_msg(char* username,unsigned char* message,EVP_PKEY* signingKey,sqlite3* db); //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db); //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 
-const char* decrypt_msg(const char *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db); // Attempts to decrypt buffer with your private key
+byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db); // Attempts to decrypt buffer with your private key
 	
 #endif /* SSC_MSGFUNC_H */

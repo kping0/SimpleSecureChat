@@ -42,11 +42,11 @@ typedef struct _win_border_struct {
 typedef struct _list_page_struct {
 	int currently_selected;
 	int elements;
-	unsigned char* screen_content[100];
+	byte* screen_content[100];
 }WPAGE;
 
 typedef struct _WIN_struct{
-	char* name;
+	byte* name;
 	int startx,starty;
 	int height,width;
 	WIN_BORDER border;
@@ -92,29 +92,29 @@ void ssc_cli_prev_page(SSCGV* gv);
 
 void ssc_cli_last_page(SSCGV* gv);
 
-void ssc_cli_add_item(WIN* p_win,char* block);
+void ssc_cli_add_item(WIN* p_win,byte* block);
 
 void ssc_cli_window_upd_highlight(SSCGV* gv);
 
-unsigned char* ssc_cli_get_current(SSCGV* gv);
+byte* ssc_cli_get_current(SSCGV* gv);
 
 int ssc_cli_cursor_move(SSCGV* gv,int c_y,int c_x);
 
 int ssc_cli_msg_cursor_move(SSCGV* gv,int c_y,int c_x);
 
-char* _getstr(void);
+byte* _getstr(void);
 
-void ssc_cli_add_message(WIN* window4msg,WIN* window4space,char* message);
+void ssc_cli_add_message(WIN* window4msg,WIN* window4space,byte* message);
 
-void ssc_cli_cmd_parser(SSCGV* gv,char* userinput);
+void ssc_cli_cmd_parser(SSCGV* gv,byte* userinput);
 
 void ssc_cli_msg_clear(SSCGV* gv);
 
-unsigned char* ssc_cli_currently_selected(WIN* p_win);
+byte* ssc_cli_currently_selected(WIN* p_win);
 
 void ssc_cli_reload_contacts(SSCGV* gv);
 
-void ssc_cli_msg_upd(SSCGV* gv,char* username);
+void ssc_cli_msg_upd(SSCGV* gv,byte* username);
 	
 
 #endif /* SSC_CLI_MENU_HEADER */

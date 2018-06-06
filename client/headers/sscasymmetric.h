@@ -40,17 +40,17 @@
 
 #include "settings.h"
 
-int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_len,
-	unsigned char *encrypted_key, int encrypted_key_len, unsigned char *iv,
-	unsigned char *plaintext);
+int envelope_open(EVP_PKEY *priv_key, byte *ciphertext, int ciphertext_len,
+	byte *encrypted_key, int encrypted_key_len, byte *iv,
+	byte *plaintext);
 
-int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
-	unsigned char **encrypted_key, int *encrypted_key_len, unsigned char *iv,
-	unsigned char *ciphertext);
+int envelope_seal(EVP_PKEY **pub_key, byte *plaintext, int plaintext_len,
+	byte **encrypted_key, int *encrypted_key_len, byte *iv,
+	byte *ciphertext);
 
-int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path4privkey);
+int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,byte* path4pubkey,byte* path4privkey);
 
-void create_keypair(char* path4pubkey,char* path4privkey,int keysize);
+void create_keypair(byte* path4pubkey,byte* path4privkey,int keysize);
 
 int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp);
 #endif

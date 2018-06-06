@@ -35,6 +35,8 @@
 
 #include <sqlite3.h> 
 
+typedef unsigned char byte;
+
 /*
  * This Function point is taken from the OpenSSL wiki -> the LICENSE for the following function is 
  * https://www.openssl.org/source/license.html
@@ -85,7 +87,7 @@ int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_le
  * End of functions taken from the OpenSSL wiki, GPL3 Applies for the rest of the functions
  */
 
-int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* path4privkey){
+int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,unsigned char* path4pubkey,unsigned char* path4privkey){
 	/*
 	* This Function reads the Public&Private key from files into (initialized)EVP_PKEY objects...
 	*/
@@ -118,7 +120,7 @@ int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,char* path4pubkey,char* pat
 
 }
 
-void create_keypair(char* path4pubkey,char* path4privkey,int keysize){
+void create_keypair(unsigned char* path4pubkey,unsigned char* path4privkey,int keysize){
     RSA* rsa = RSA_new();
     BIGNUM* prime = BN_new();
     BN_set_word(prime,RSA_F4);
@@ -161,7 +163,7 @@ int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of ho
 		return 0;	
 	}
 	RAND_poll(); //Change Seed for CGRNG
-	unsigned char*enc_buf = malloc(2000);
+	unsigned char* enc_buf = malloc(2000);
 	int enc_len = envelope_seal(&pubk_evp,msg,strlen((const char*)msg),&ek,&ekl,iv,enc_buf); //encrypt
 	if(enc_len <= 0){
 		puts("ERROR IN TESTFUNCTION");

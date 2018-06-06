@@ -41,7 +41,7 @@ sscsl *SSCS_list(void){
 	return list;
 }
 sscsl *SSCS_list_open(byte* buf){
-	size_t len = strlen((const char*)buf);
+	size_t len = strlen((byte*)buf);
 	void* buf_ptr = calloc(1,len);
 	memcpy(buf_ptr,buf,len);
 	sscsl *list = calloc(1,sizeof(struct SSCS_list));
@@ -51,7 +51,7 @@ sscsl *SSCS_list_open(byte* buf){
 }
 
 sscso *SSCS_open(byte* buf){
-	size_t len = strlen((const char*)buf);
+	size_t len = strlen((byte*)buf);
 	void* buf_ptr = calloc(1,len);
 	memcpy(buf_ptr,buf,len);
 	sscso* obj = calloc(1,sizeof(struct SSCS_struct));
@@ -67,9 +67,9 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	size_t encoded_size;
 	byte* b64data = base64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
-	char label[12];
+	byte label[12];
 	sprintf(label,"%zd:\"",old_buf_items+1);
-	int label_len = strlen((const char*)label);
+	int label_len = strlen((byte*)label);
 	size_t final_intermediate_len = b64datalen+label_len+2;
 	byte* intermediatebuf = calloc(1,final_intermediate_len);
 	memset(intermediatebuf,0,final_intermediate_len);
@@ -106,13 +106,13 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	free(intermediatebuf);
 	return 0;
 }
-int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
+int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
 	if(size <= 0)return -1; //Size has to be bigger than 0
 	void *old_buf_ptr = obj->buf_ptr;
 	size_t old_buf_size = obj->allocated;	
-	int label_len = (int)strlen((const char*)label);
+	int label_len = (int)strlen((byte*)label);
 	int modlabel_len = label_len+2;
-	char* modlabel = calloc(1,modlabel_len+1); //+1 for the NUL 
+	byte* modlabel = calloc(1,modlabel_len+1); //+1 for the NUL 
 	sprintf(modlabel,"%s:\"",label);
 	size_t encoded_size;
 	if(old_buf_ptr != NULL){
@@ -160,10 +160,10 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	free(modlabel);
 	return 0;
 }
-sscsd* SSCS_object_data(sscso* obj,char* label){
+sscsd* SSCS_object_data(sscso* obj,byte* label){
 	byte* buf_ptr = obj->buf_ptr;
 	size_t allocated = obj->allocated;
-	size_t label_len = strlen((const char*)label);
+	size_t label_len = strlen((byte*)label);
 	byte* readpointer = memseq(buf_ptr,allocated,(byte*)label,label_len);
 	if(readpointer == NULL){
 		//puts("Label Not Found");
@@ -201,7 +201,7 @@ sscsd* SSCS_object_data(sscso* obj,char* label){
 	}
 	size_t len; 
 	sscsd* final = calloc(1,sizeof(sscsd));
-	final->data = base64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
+	final->data = base64_decode((const byte*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
 	free(b64buffer);
 	return final;
@@ -210,9 +210,9 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	if(index > 4096)return NULL; //support a max of 4096 items
 	byte* buf_ptr = list->buf_ptr;
 	size_t allocated = list->allocated;
-	char* label = calloc(1,30);
+	byte* label = calloc(1,30);
 	sprintf(label,"%d:\"",index);
-	size_t label_len = strlen((const char*)label);
+	size_t label_len = strlen((byte*)label);
 	int i = 0;
 	byte* readpointer = memseq(buf_ptr,allocated,(byte*)label,label_len);
 	if(readpointer == NULL){
@@ -244,14 +244,14 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	}
 	size_t len; 
 	sscsd* final = calloc(1,sizeof(sscsd));
-	final->data = base64_decode((const unsigned char*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
+	final->data = base64_decode((const byte*)b64buffer,b64encoded_len,&len); //NOTE THAT THIS IS A POINTER (if an integer was serialized an (int*) )
 	final->len = len;
 	free(b64buffer);
 	free(label);
 	return final;
 }
-char* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
-	char* retptr = calloc(1,obj->allocated+2);
+byte* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
+	byte* retptr = calloc(1,obj->allocated+2);
 	memcpy(retptr,obj->buf_ptr,obj->allocated);
 	*(retptr+obj->allocated+1) = '\0';	
 	return retptr;
@@ -260,8 +260,8 @@ char* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
 size_t SSCS_object_encoded_size(sscso* obj){ //Get size of string(often needs to be specified when sending over socket)
 	return obj->allocated;	
 } 
-char* SSCS_list_encoded(sscsl* list){
-	char* retptr = calloc(1,list->allocated+1);
+byte* SSCS_list_encoded(sscsl* list){
+	byte* retptr = calloc(1,list->allocated+1);
 	memcpy(retptr,list->buf_ptr,list->allocated);
 	*(retptr+list->allocated) = '\0';
 	return retptr;
@@ -305,7 +305,7 @@ void SSCS_list_release(sscsl** list){
 /*
 * Wrappers for SSCS_object_data() to simplify usage 
 */
-int SSCS_object_int(sscso* obj,char* label){
+int SSCS_object_int(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(int)){
@@ -317,7 +317,7 @@ int SSCS_object_int(sscso* obj,char* label){
 	SSCS_data_release(&data);
 	return retval;
 }
-double SSCS_object_double(sscso* obj,char* label){
+double SSCS_object_double(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(double)){
@@ -329,10 +329,10 @@ double SSCS_object_double(sscso* obj,char* label){
 	SSCS_data_release(&data);
 	return retval;
 }
-unsigned char* SSCS_object_string(sscso* obj,char* label){
+byte* SSCS_object_string(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return NULL;
-	unsigned char* ret_ptr = calloc(1,data->len+2);
+	byte* ret_ptr = calloc(1,data->len+2);
 	memcpy(ret_ptr,data->data,data->len);
 	*(ret_ptr+data->len + 1) = '\0';
 	SSCS_data_release(&data);

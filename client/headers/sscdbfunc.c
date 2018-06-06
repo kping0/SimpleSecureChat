@@ -350,7 +350,7 @@ void* update_messages_db(void* data){
 	BIO* srvconn = gv->conn;
 	EVP_PKEY* priv_evp = gv->privkey;
 	char* getmsgbuf = (char*)server_get_messages(db);	//Get buffer to send to server
-	if(!getmsgbuf)return;
+	if(!getmsgbuf)return NULL;
 	char* decbuf = NULL;
 	char* recvbuf = malloc(200000);
 	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	//Send buffer to server
@@ -358,7 +358,7 @@ void* update_messages_db(void* data){
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
 	
-	if(strcmp(recvbuf,"ERROR") != NULL){
+	if(strcmp(recvbuf,"ERROR") != 0){
 	sscsl* list = SSCS_list_open(recvbuf);
 	int i = 0;	
 	while(1){

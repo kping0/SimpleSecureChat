@@ -46,13 +46,13 @@ struct sscswidgets_gui{
 	GtkWidget *recvlist; //Handle to recvlist(all received messages from partner)
 	GtkWidget *window; //Handle to Window
 	GtkLabel *chatpartnerlabel; //label that changes when you switch chat partner
-	char** current_username; //Username of chat partner (not the local user)
+	byte** current_username; //Username of chat partner (not the local user)
 };
 typedef struct sscswidgets_gui sscvars_gui;
 
 struct sscsbutton_gui{
 	struct sscswidgets_gui* widgets;
-	char* item;
+	byte* item;
 };
 
 void init_gui(struct sscswidgets_gui* data);
@@ -61,17 +61,17 @@ void clear_messages_gui(struct sscswidgets_gui* data);
 
 void clear_recvlist_gui(struct sscswidgets_gui* data);
 
-void append_list_string_gui(GtkWidget* list,char* item); //add label to widget list
+void append_list_string_gui(GtkWidget* list,byte* item); //add label to widget list
 
 void change_current_user_gui(GtkWidget* widget,gpointer data); 
 
-void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,char* contactname);
+void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,byte* contactname);
 
 void send_message_entry_gui(GtkEntry* entry,gpointer data);
 
 void add_user_entry_gui(GtkEntry* entry,gpointer data);
 
-void addnewuser_gui(struct sscswidgets_gui* widgets_gui,char* username);
+void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username);
 
 gboolean getmessages_gui(void* data);
 

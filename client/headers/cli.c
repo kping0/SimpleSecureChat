@@ -25,7 +25,7 @@ void ssc_cli_init(void){
 	keypad(stdscr,TRUE);
 	noecho();
 	init_pair(1,COLOR_CYAN,COLOR_BLACK);
-	curs_set(1);
+	curs_set(0);
 	return;
 }
 
@@ -91,9 +91,13 @@ void ssc_cli_cust_updwin(WIN* p_win,bool flag){ //flag == TRUE -> createwin / fl
 	refresh();
 	return;
 }
-void debugprint(char* text){
+void debugprint(byte* text){
+#ifdef DEBUG
 	mvwprintw(stdscr,0,0,"[DEBUG] %s",text);
 	refresh();
+#else
+	(void)text;
+#endif
 	return;
 }
 
@@ -104,7 +108,7 @@ void ssc_cli_add_page(WIN* p_win){
 	WPAGE* new_page = calloc(1,sizeof(WPAGE));	
 	new_page->currently_selected = 0;
 	new_page->elements = 0;
-	memset(new_page->screen_content,0,sizeof(unsigned char*) * 100);
+	memset(new_page->screen_content,0,sizeof(byte*) * 100);
 	p_win->current_page = new_page;	
 	p_win->page_index++;
 	p_win->pages[p_win->page_index] = new_page;
@@ -132,7 +136,7 @@ void ssc_cli_window_reload(WIN* p_win){
 			mvaddch(j, i, ' ');
 	for(j = y+1; j <= y + h-1; ++j){
 		if(j-y-1 == elements)return;
-		unsigned char* line = current_page->screen_content[j-y];
+		byte* line = current_page->screen_content[j-y];
 		if(line != NULL)
 			mvwprintw(stdscr,j,x+1,"%s",line);	
 		else
@@ -143,7 +147,7 @@ void ssc_cli_window_reload(WIN* p_win){
 }
 
 /*
- * move curor to list known position in memory -> useful for resetting the cursor after calling other
+ * move cursor to list known position in memory -> useful for resetting the cursor after calling other
  * functions
  */
 void ssc_cli_switch_current(WIN* p_win){
@@ -163,11 +167,11 @@ void ssc_cli_switch_current(WIN* p_win){
 /*
  * 
  */
-unsigned char* ssc_cli_currently_selected(WIN* p_win){
+byte* ssc_cli_currently_selected(WIN* p_win){
 	WPAGE* current_page = p_win->current_page;
-	if(!current_page)return;
+	if(!current_page)return NULL;
 	int current = current_page->currently_selected;	
-	return (unsigned char*)(current_page->screen_content[current]);
+	return (byte*)(current_page->screen_content[current]);
 }
 
 /*
@@ -234,7 +238,7 @@ void ssc_cli_last_page(SSCGV* gv){
 /*
  * append item to current_page
  */
-void ssc_cli_add_item(WIN* p_win,char* block){
+void ssc_cli_add_item(WIN* p_win,byte* block){
 	WPAGE* current_page = p_win->current_page;
 	if(!current_page)return;
 	int x,y,w,h,elements;
@@ -251,7 +255,7 @@ void ssc_cli_add_item(WIN* p_win,char* block){
 		return;
 	}
 	size_t blocksize = strlen(block);
-	unsigned char* saved_block = calloc(1,blocksize);	
+	byte* saved_block = calloc(1,blocksize);	
 	memcpy(saved_block,block,blocksize);
 	current_page->screen_content[elements+1] = saved_block;
 	mvwprintw(stdscr,y+1+elements,x+1,"%s",saved_block);
@@ -276,9 +280,11 @@ void ssc_cli_window_upd_highlight(SSCGV* gv){
 	getyx(stdscr,c_y,c_x);
 	(void)c_x;
 	int index = c_y - p_win->starty;
-	unsigned char* highlight_object = current_page->screen_content[index];
+	byte* highlight_object = current_page->screen_content[index];
 	current_page->currently_selected = index;
+#ifdef DEBUG
 	mvwprintw(stdscr,0,0,"[DEBUG] selected object is %s\n",highlight_object);
+#endif
 	if(!(index-2 < 0))mvwprintw(stdscr,c_y-2,p_win->startx+1,"%s",current_page->screen_content[index-2]);
 	attron(A_REVERSE);
 	mvwprintw(stdscr,c_y,p_win->startx+1,"%s",highlight_object);		
@@ -288,12 +294,13 @@ void ssc_cli_window_upd_highlight(SSCGV* gv){
 		wmove(stdscr,c_y,p_win->startx+1);
 	}
 	if(elements-index <= 0)	wmove(stdscr,c_y-2,p_win->startx+1);
+	return;
 }
 
 /*
  * get currently selected item
  */
-unsigned char* ssc_cli_get_current(SSCGV* gv){
+byte* ssc_cli_get_current(SSCGV* gv){
 	WIN* p_win = gv->current;
 	int c_y,c_x;
 	getyx(stdscr,c_y,c_x);
@@ -308,7 +315,7 @@ unsigned char* ssc_cli_get_current(SSCGV* gv){
 int ssc_cli_cursor_move(SSCGV* gv,int c_y,int c_x){ 
 	WIN* p_win = gv->current;
 	WPAGE* current_page = p_win->current_page;
-	if(!current_page)return;
+	if(!current_page)return -1;
 	int y = p_win->starty;
 	int elements = current_page->elements;
 	if(elements <= 0)return -1;
@@ -339,7 +346,7 @@ int ssc_cli_msg_cursor_move(SSCGV* gv,int c_y,int c_x){
 	}
 
 	WPAGE* current_page = p_win->current_page;
-	if(!current_page)return;
+	if(!current_page)return -1;
 	int y = p_win->starty;
 	int elements = current_page->elements;
 	if(elements <= 0)return -1;
@@ -361,36 +368,50 @@ int ssc_cli_msg_cursor_move(SSCGV* gv,int c_y,int c_x){
 /*
  * get 1024 null terminated string from input
  */
-char* _getstr(void){
+byte* _getstr(void){
 	int row,col;
 	getmaxyx(stdscr,row,col);
 	mvwprintw(stdscr,row-1,5,"<CMD_MODE>: ");			
 	int y,x;
 	getyx(stdscr,y,x);
-	(void)x;
-	nocbreak();	
 	echo();
 	curs_set(1);	
-	char* string = calloc(1,1024);
+	byte* string = calloc(1,1024);
 	int i = 0;
 	int ch = getch();	
-	while(ch != '\n' && i+1 < 1024){
-		string[i] = ch;
-		i++;
+	while(ch != 27 && ch != '\n' && i+1 < 1024){
+		if(ch == KEY_BACKSPACE){
+			if(i != 0){
+				delch();
+				i--;
+				string[i] = 0;
+			}else{
+				move(y,x);	
+			}
+		}
+		else{	
+			string[i] = ch;
+			i++;
+		}
 		ch = getch();
 	}
-	cbreak();
 	noecho();
 	curs_set(0);
-	string[1023] = '\0';
 	mvhline(y,1,' ',col-1);
-	return string;
+	if(ch != 27){
+		string[1023] = '\0';
+		return string;
+	}
+	else{
+		free(string);
+		return NULL;
+	}
 }
 
 /*
  * add message to one window, and add blank to the other
  */
-void ssc_cli_add_message(WIN* window4msg,WIN* window4space,char* message){
+void ssc_cli_add_message(WIN* window4msg,WIN* window4space,byte* message){
 	ssc_cli_add_item(window4msg,message);
 	ssc_cli_add_item(window4space,"          ");
 	return;
@@ -403,7 +424,7 @@ void ssc_cli_msg_clear(SSCGV* gv){
 	WIN* received = gv->received;
 	WIN* sent = gv->sent;
 	WPAGE* _page,*new_page;
-	char* element;
+	byte* element;
 	int i,x;
 	int page_count = sent->page_count;
 	for(i = 0;i<=page_count;i++){
@@ -444,24 +465,70 @@ void ssc_cli_msg_clear(SSCGV* gv){
 /*
  * update the messages from the db
  */
-void ssc_cli_msg_upd(SSCGV* gv,char* username){
-	ssc_cli_msg_clear(gv);
+void ssc_cli_msg_upd(SSCGV* gv,byte* username){
+
+/* Slightly modified code from ssc_cli_msg_clear() to save the previous list position START */
+	WIN* received = gv->received;
+	WIN* sent = gv->sent;
+	WPAGE* _page,*new_page;
+	byte* element;
+	int saved_c_sent,saved_c_recv;
+	int i,x;
+	int page_count = sent->page_count;
+	saved_c_sent = sent->current_page->currently_selected;
+	for(i = 0;i<=page_count;i++){
+		_page = sent->pages[i];
+		if(_page != NULL){
+			for(x = 0;x<100;x++){
+				element = _page->screen_content[x];
+				if(element != NULL)free(element);
+			}	
+			free(_page);
+		}
+	}
+	memset(sent->pages,0,sizeof(WPAGE*) * 1000); 
+	new_page = calloc(1,sizeof(WPAGE));
+	sent->pages[1] = new_page;
+	sent->current_page = new_page;
+	sent->current_page->currently_selected = saved_c_sent; //so we dont lose position in list
+	ssc_cli_window_reload(sent);
+	page_count = received->page_count;
+	saved_c_recv = received->current_page->currently_selected;
+	for(i = 0;i<page_count;i++){
+		_page = received->pages[i];
+		if(_page != NULL){
+			for(x = 0;x<100;x++){
+				element = _page->screen_content[x];
+				if(element != NULL)free(element);
+			}	
+			free(_page);
+		}
+	}
+	memset(received->pages,0,sizeof(WPAGE*) * 1000); 
+	new_page = calloc(1,sizeof(WPAGE));
+	received->pages[1] = new_page;
+	received->current_page = new_page;
+	received->current_page->currently_selected = saved_c_recv;
+	ssc_cli_window_reload(received);
+	ssc_cli_switch_current(gv->current);
+/* END of clear code */
+
 	sqlite3* db = gv->db;
 	sqlite3_stmt* stmt;
 	BIO* srvconn = gv->conn;
 	EVP_PKEY* priv_evp = gv->privkey;
 	WIN* recvlist = gv->received;
 	WIN* messagelist = gv->sent;
-	char* current_user = username;
+	byte* current_user = username;
 	if(!current_user)return;
 /*
  * if SSC_UPDATE_THREAD is NOT present, update messages here.
  */
 #ifndef SSC_UPDATE_THREAD
-	char* getmsgbuf = (char*)server_get_messages(db);	//Get buffer to send to server
+	byte* getmsgbuf = (byte*)server_get_messages(db);	//Get buffer to send to server
 	if(!getmsgbuf)return;
-	char* decbuf = NULL;
-	char* recvbuf = malloc(200000);
+	byte* decbuf = NULL;
+	byte* recvbuf = malloc(200000);
 	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	//Send buffer to server
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
@@ -476,9 +543,9 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 			if(!prebuf)break;
 			sscso* obj2 = SSCS_open(prebuf->data);
 			SSCS_data_release(&prebuf);
-			char* sender = SSCS_object_string(obj2,"sender");
+			byte* sender = SSCS_object_string(obj2,"sender");
 			if(!sender)break;
-			decbuf = (char*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
+			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
 			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));
 			sqlite3_bind_text(stmt,2,decbuf,-1,0);
@@ -504,14 +571,15 @@ void ssc_cli_msg_upd(SSCGV* gv,char* username){
 	while(sqlite3_step(stmt) == SQLITE_ROW){
 		int sqluid = sqlite3_column_int(stmt,0);
 		if(sqluid == 1){
-			ssc_cli_add_message(messagelist,recvlist,sqlite3_column_text(stmt,1));
+			ssc_cli_add_message(messagelist,recvlist,(byte*)sqlite3_column_text(stmt,1));
 		}	
 		else if(sqluid == currentuserUID){
-			ssc_cli_add_message(recvlist,messagelist,sqlite3_column_text(stmt,1));
+			ssc_cli_add_message(recvlist,messagelist,(byte*)sqlite3_column_text(stmt,1));
 		}
 	}
 	sqlite3_finalize(stmt);
 	ssc_cli_switch_current(gv->current);
+	ssc_cli_window_upd_highlight(gv);
 	return;
 }
 
@@ -547,7 +615,7 @@ void ssc_cli_reload_contacts(SSCGV* gv){
 	assert(stmt);
 
 	while(sqlite3_step(stmt) == SQLITE_ROW){
-		ssc_cli_add_item(contacts,sqlite3_column_text(stmt,0));
+		ssc_cli_add_item(contacts,(byte*)sqlite3_column_text(stmt,0));
 	}	
 
 	sqlite3_finalize(stmt);
@@ -559,10 +627,9 @@ void ssc_cli_reload_contacts(SSCGV* gv){
 /*
  * parse user commands 
  */
-void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){ 
+void ssc_cli_cmd_parser(SSCGV* gv,byte* userinput){ 
+	if(!userinput)return;
 	WIN* contacts = gv->contacts;
-	WIN* received = gv->received;
-	WIN* sent = gv->sent;
 	sqlite3* db = gv->db;
 	BIO* conn = gv->conn;
 	EVP_PKEY* privkey = gv->privkey;
@@ -571,8 +638,8 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){
 		debugprint("length of command too short.");	
 	}
 	else if(strncmp(userinput,"send",4) == 0){
-		char* tmp = userinput+5;
-		char* usrname = strtok(tmp," ");	
+		byte* tmp = userinput+5;
+		byte* usrname = strtok(tmp," ");	
 		size_t usrnamel = strlen(tmp);
 		byte* message = tmp+usrnamel+1;
 		byte* encbuf = encrypt_msg(usrname,message,privkey,db); 
@@ -588,10 +655,10 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){
 		ssc_cli_msg_upd(gv,usrname);
 	}
 	else if(strncmp(userinput,"add",3) == 0){
-		char* usraddbuf = (char*)server_get_user_rsa(userinput+4);
+		byte* usraddbuf = (byte*)server_get_user_rsa(userinput+4);
 		BIO_write(conn,usraddbuf,strlen(usraddbuf));
 		free(usraddbuf);
-		char* rxbuf = calloc(1,4096);
+		byte* rxbuf = calloc(1,4096);
 		BIO_read(conn,rxbuf,4096);
 		rxbuf[4095] = '\0';
 		if(strcmp(rxbuf,"GETRSA_RSP_ERROR") == 0){
@@ -600,15 +667,15 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){
 		else{
 			sqlite3_stmt* stmt;
 			sscso* obj = SSCS_open(rxbuf);
-			char* rsapub64 = SSCS_object_string(obj,"b64rsa");
+			byte* rsapub64 = SSCS_object_string(obj,"b64rsa");
 			if(!rsapub64){
-				puts("No supplied public key");
+				puts("no supplied public key");
 				return;
 			}
 			int rsalen = SSCS_object_int(obj,"rsalen");
 			sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
 			sqlite3_bind_text(stmt,1,userinput+4,-1,0);
-			sqlite3_bind_text(stmt,2,(const char*)rsapub64,-1,0);
+			sqlite3_bind_text(stmt,2,(byte*)rsapub64,-1,0);
 			sqlite3_bind_int(stmt,3,rsalen);
 			sqlite3_step(stmt);
 			sqlite3_finalize(stmt);
@@ -625,7 +692,7 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){
 	}
 	else if(strncmp(userinput,"delete",6) == 0){
 		debugprint("delete");	
-		sqlite3* stmt;
+		sqlite3_stmt* stmt;
 		sqlite3_prepare_v2(db,"delete from KNOWNUSERS WHERE username = ?1;",-1,&stmt,NULL);
 		sqlite3_bind_text(stmt,1,userinput+7,-1,0);
 		sqlite3_step(stmt);
@@ -634,6 +701,7 @@ void ssc_cli_cmd_parser(SSCGV* gv,char* userinput){
 	else{
 		debugprint("Command not recognized.");
 	}
+		debugprint(userinput);
 		ssc_cli_switch_current(gv->current);
 	return;
 }

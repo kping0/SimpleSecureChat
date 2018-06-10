@@ -6,7 +6,6 @@
 
 #include "base64.h" 
 #include "serialization.h" 
-#include "settings.h"
 
 /*
  * SimpleSecureChat Serialization Library. Made with Security in mind.
@@ -71,7 +70,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
 	if(old_buf_items >= 1000000)return -1; //If more than 1M items exists exit
-	char label[12];
+	byte label[12];
 	sprintf(label,"%zd:\"",old_buf_items+1);
 	int label_len = strlen((const char*)label);
 	size_t final_intermediate_len = b64datalen+label_len+2;
@@ -110,19 +109,20 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	cfree(intermediatebuf);
 	return 0;
 }
-int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
+int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
 	if(size <= 0)return -1; //Size has to be bigger than 0
 	void *old_buf_ptr = obj->buf_ptr;
 	size_t old_buf_size = obj->allocated;	
 	int label_len = (int)strlen((const char*)label);
 	int modlabel_len = label_len+2;
-	char* modlabel = cmalloc(modlabel_len+1); //+1 for the NUL 
+	byte* modlabel = cmalloc(modlabel_len+1); //+1 for the NUL 
 	sprintf(modlabel,"%s:\"",label);
 	size_t encoded_size;
 	if(old_buf_ptr != NULL){
 		byte* validationpointer = memseq((byte*)old_buf_ptr,old_buf_size,(byte*)modlabel,modlabel_len);
 		if(validationpointer != NULL){
-			//puts("Label Already Exists");	
+			cfree(modlabel);
+			cinfo("SSCS_object_add_data() label '%s' already exists",label);
 			return -1;
 		}
 	}
@@ -164,7 +164,48 @@ int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size){
 	cfree(modlabel);
 	return 0;
 }
-sscsd* SSCS_object_data(sscso* obj,char* label){
+int SSCS_object_remove_data(sscso* obj,byte* label){
+	if(!label)return -1;
+	byte *buf_ptr = obj->buf_ptr;
+	if(!buf_ptr)return -1;
+	size_t buf_size = obj->allocated;	
+	size_t label_len = strlen((const char*)label);
+	size_t modlabel_len = label_len+2;
+	byte modlabel[modlabel_len+1];
+	sprintf(modlabel,"%s:\"",label);
+	byte* label_data = memseq(buf_ptr,buf_size,(byte*)modlabel,modlabel_len);
+	if(!label_data){
+		cinfo("SSCS_object_remove_data() there is no data associated with the label '%s'",label);
+		cfree(modlabel);
+		return -1;
+	}
+	byte* wptr = label_data + modlabel_len; //start of b64data
+	size_t count_iteration = 0;
+	while(wptr[count_iteration] != '"' && wptr[count_iteration+1] != ';'){ //Run once to get length of string 
+		if(!((wptr+count_iteration)-buf_ptr < (signed)buf_size)){
+			cerror("SSCS_object_remove_data() out of bounds loop");
+			cfree(modlabel);
+			return -1;	
+		}
+		count_iteration++;	
+	}
+	count_iteration+=2; //for the ' "; ' at the end
+	memset(label_data,'0',count_iteration+modlabel_len);		
+	size_t buf_ptr_to_label_data = label_data - buf_ptr;
+	cdebug("calculated buf_ptr_to_label_data %d",buf_ptr_to_label_data);
+	size_t after_data_to_allocated = buf_size - buf_ptr_to_label_data - /* following is the actual removed block */ count_iteration - modlabel_len; //bytes after removed block
+	cdebug("calculated label_data_to_allocated %d",after_data_to_allocated);
+	memmove(label_data,label_data+count_iteration+modlabel_len,after_data_to_allocated);
+	size_t buffer_size_after_remove = buf_ptr_to_label_data+after_data_to_allocated;
+	cdebug("final buffer after remove is %d",buffer_size_after_remove);
+	byte* new_buf_ptr = cmalloc(buffer_size_after_remove);
+	memcpy(new_buf_ptr,buf_ptr,buffer_size_after_remove);
+	cfree(buf_ptr);
+	obj->buf_ptr = new_buf_ptr;
+	obj->allocated = buffer_size_after_remove;
+	return 0;
+}
+sscsd* SSCS_object_data(sscso* obj,byte* label){
 	byte* buf_ptr = obj->buf_ptr;
 	size_t allocated = obj->allocated;
 	size_t label_len = strlen((const char*)label);
@@ -203,7 +244,7 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	if(index > 4096)return NULL; //support a max of 4096 items
 	byte* buf_ptr = list->buf_ptr;
 	size_t allocated = list->allocated;
-	char* label = cmalloc(30);
+	byte* label = cmalloc(30);
 	sprintf(label,"%d:\"",index);
 	size_t label_len = strlen((const char*)label);
 	int i = 0;
@@ -242,8 +283,8 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	cfree(label);
 	return final;
 }
-char* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
-	char* retptr = cmalloc(obj->allocated+2);
+byte* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
+	byte* retptr = cmalloc(obj->allocated+2);
 	memcpy(retptr,obj->buf_ptr,obj->allocated);
 	*(retptr+obj->allocated+1) = '\0';	
 	return retptr;
@@ -252,8 +293,8 @@ char* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
 size_t SSCS_object_encoded_size(sscso* obj){ //Get size of string(often needs to be specified when sending over socket)
 	return obj->allocated;	
 } 
-char* SSCS_list_encoded(sscsl* list){
-	char* retptr = cmalloc(list->allocated+1);
+byte* SSCS_list_encoded(sscsl* list){
+	byte* retptr = cmalloc(list->allocated+1);
 	memcpy(retptr,list->buf_ptr,list->allocated);
 	*(retptr+list->allocated) = '\0';
 	return retptr;
@@ -297,7 +338,7 @@ void SSCS_list_release(sscsl** list){
 /*
 * Wrappers for SSCS_object_data() to simplify usage 
 */
-int SSCS_object_int(sscso* obj,char* label){
+int SSCS_object_int(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(int)){
@@ -309,7 +350,7 @@ int SSCS_object_int(sscso* obj,char* label){
 	SSCS_data_release(&data);
 	return retval;
 }
-double SSCS_object_double(sscso* obj,char* label){
+double SSCS_object_double(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(double)){
@@ -321,7 +362,7 @@ double SSCS_object_double(sscso* obj,char* label){
 	SSCS_data_release(&data);
 	return retval;
 }
-unsigned char* SSCS_object_string(sscso* obj,char* label){
+unsigned char* SSCS_object_string(sscso* obj,byte* label){
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return NULL;
 	unsigned char* ret_ptr = cmalloc(data->len+2);

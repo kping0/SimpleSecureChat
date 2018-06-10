@@ -47,6 +47,7 @@
 #include "headers/serialization.h" //SSCS Library
 #include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
 #include "headers/cstdinfo.h" //custom error & info printing
+#include "headers/simpleconfig.h" //configfile support
 
 struct sscs_handler_data{
 	int client_socket;

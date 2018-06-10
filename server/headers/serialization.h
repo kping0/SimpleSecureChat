@@ -2,6 +2,7 @@
 #define SSCS_SERIALIZATION
 
 #include "settings.h"
+#include "cstdinfo.h"
 
 struct SSCS_struct{ //SSCS_object
 	void* buf_ptr; //Pointer to current buffer
@@ -38,19 +39,19 @@ sscso *SSCS_open(byte* buf); //Open an encoded sscs object
 
 sscsl *SSCS_list_open(byte* buf); //open an encoded list
 
-int SSCS_object_add_data(sscso* obj,char* label,byte* data,size_t size); //adds data to a SSCS_object 
+int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size); //adds data to a SSCS_object 
 
-sscsd* SSCS_object_data(sscso* obj,char* label); //returns SSCS_data struct that has to be freed using SSCS_data_release(&data_structure)
+sscsd* SSCS_object_data(sscso* obj,byte* label); //returns SSCS_data struct that has to be freed using SSCS_data_release(&data_structure)
 
 int SSCS_list_add_data(sscsl* list,byte* data,size_t size); //add data to list 
 
 sscsd* SSCS_list_data(sscsl* list,unsigned int index); //get data from list with an index of i (i < 4096)
 
-char* SSCS_object_encoded(sscso* obj); //get encoded version of SSCS_object
+byte* SSCS_object_encoded(sscso* obj); //get encoded version of SSCS_object
 
 size_t SSCS_object_encoded_size(sscso* obj); //get size of sscs_encoded object
 
-char* SSCS_list_encoded(sscsl* list); //get encoded version of SSCS_list
+byte* SSCS_list_encoded(sscsl* list); //get encoded version of SSCS_list
 
 size_t SSCS_list_encoded_size(sscsl* list); //get size of sscs encoded list
 
@@ -66,11 +67,13 @@ void SSCS_data_release(sscsd** data); //release associated pointers and struct i
 
 void SSCS_list_release(sscsl** list); //s.o SSCS_list_release(&list)
 
-int SSCS_object_int(sscso* obj,char* label); //wrapper around SSCS_object_data
+int SSCS_object_int(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
-double SSCS_object_double(sscso* obj,char* label); //wrapper around SSCS_object_data
+double SSCS_object_double(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
-unsigned char* SSCS_object_string(sscso* obj,char* label); //wrapper around SSCS_object_data
+unsigned char* SSCS_object_string(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
+int SSCS_object_remove_data(sscso* obj,byte* label);
+	
 #endif /* SSCS_SERIALIZATION */
 

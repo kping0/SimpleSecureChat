@@ -131,7 +131,7 @@ void* sscs_cmalloc(size_t size,const char* file, int line){
 	size_t alloc_len = size + PAGESIZE - (size % PAGESIZE) + PAGESIZE; //get next multiple of pagesize that fits size&metadata + guardpage length
 	char* buf = aligned_alloc(PAGESIZE,alloc_len);
 	if(!buf){
-		cerror(" could not allocate aligned memory (called from %s line %d)\n",file,line);
+		cexit("cmalloc() could not allocate aligned memory (called from %s line %d)\n",file,line);
 		return NULL;
 	}
 	memset(buf,0,alloc_len);

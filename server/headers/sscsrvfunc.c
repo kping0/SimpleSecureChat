@@ -45,15 +45,19 @@ int my_mysql_query(MYSQL* con,char* query){ //mysql_query() with error checking
 } /* my_mysql_query */
 
 void init_DB(void){ //prepare database
-	cinfo("MySQL client version-> %s\n",mysql_get_client_info());
+	cinfo("MySQL client version-> %s",mysql_get_client_info());
+	char* srvhost = sconfig_get_str(config,"SSCDB_SRV");	
+	char* srvuser = sconfig_get_str(config,"SSCDB_USR");
+	char* srvpass = sconfig_get_str(config,"SSCDB_PASS");
+	cinfo("Trying to get a session started with the MySQL server %s(%s)",srvhost,srvuser);
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
 		cerror(" %s\n",mysql_error(con));
 		exit(1);
 	}
-	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,NULL,0,NULL,0))exit_mysql_err(con);
+	if(!mysql_real_connect(con,srvhost,srvuser,srvpass,NULL,0,NULL,0))exit_mysql_err(con);
 	if(mysql_query(con,"use SSCServerDB")){
-		cerror(" ? Server DB not found, First Time Run? -> Trying to Create Database\n");
+		cinfo(" ? Server DB not found, First Time Run? -> Trying to Create Database\n");
 		if(mysql_query(con,"CREATE DATABASE SSCServerDB"))exit_mysql_err(con);
 		if(mysql_query(con,"use SSCServerDB"))exit_mysql_err(con);
 		
@@ -62,6 +66,9 @@ void init_DB(void){ //prepare database
 	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS MESSAGES(MSGID INT AUTO_INCREMENT PRIMARY KEY,RECVUID INTEGER NOT NULL,MESSAGE TEXT NOT NULL)");
 	my_mysql_query(con,"CREATE TABLE IF NOT EXISTS KNOWNUSERS(UID INT AUTO_INCREMENT PRIMARY KEY,USERNAME TEXT NOT NULL,RSAPUB64 TEXT NOT NULL,RSALEN INT NOT NULL,SHA256 TEXT NOT NULL,SALT TEXT NOT NULL)");
 	mysql_close(con); 
+	cfree(srvhost);
+	cfree(srvuser);
+	cfree(srvpass);
 	return;
 } /* init_DB */
 
@@ -75,7 +82,13 @@ MYSQL* get_handle_DB(void){ //return active handle to database
 	pthread_exit(NULL);
 #endif
 	}
-	if(!mysql_real_connect(con,SSCDB_SRV,SSCDB_USR,SSCDB_PASS,"SSCServerDB",0,NULL,0))exit_mysql_err(con);
+	char* srvhost = sconfig_get_str(config,"SSCDB_SRV");	
+	char* srvuser = sconfig_get_str(config,"SSCDB_USR");
+	char* srvpass = sconfig_get_str(config,"SSCDB_PASS");
+	if(!mysql_real_connect(con,srvhost,srvuser,srvpass,"SSCServerDB",0,NULL,0))exit_mysql_err(con);
+	cfree(srvhost);
+	cfree(srvuser);
+	cfree(srvpass);
 	return con;	
 } /* get_handle_DB */
 
@@ -133,17 +146,31 @@ SSL_CTX *create_context(){
 } /* create_context */
 
 void configure_context(SSL_CTX *ctx){
-    SSL_CTX_set_default_passwd_cb_userdata(ctx,SSCS_KEYFILE_PW);
+    char* keypw = sconfig_get_str(config,"SSCS_KEYFILE_PW");
+    char* certfile = sconfig_get_str(config,"SSCS_CERTFILE");
+    char* keyfile = sconfig_get_str(config,"SSCS_KEYFILE");
+    SSL_CTX_set_default_passwd_cb_userdata(ctx,keypw);
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx,SSCS_CERTFILE , SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx,certfile , SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
+        cfree(keypw);
+        cfree(certfile);
+ 	cfree(keyfile);
 	exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx,SSCS_KEYFILE, SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx,keyfile, SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
+        cfree(keypw);
+        cfree(certfile);
+ 	cfree(keyfile);
 	exit(EXIT_FAILURE);
     }
+
+    cfree(keypw);
+    cfree(certfile);
+    cfree(keyfile);
+    return;
 } /* configure_context */
 
 int checkforUser(char* username,MYSQL* db){ //Check if user exists in database, returns 1 if true, 0 if false

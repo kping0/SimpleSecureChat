@@ -29,16 +29,25 @@
 #include <time.h>
 #include "settings.h"
 
+#define cdebug(x, ...) cdebug_internal(__FUNCTION__, x, ##__VA_ARGS__)
+#define cinfo(x, ...) cinfo_internal(__FUNCTION__, x, ##__VA_ARGS__)
+#define cerror(x, ...) cerror_internal(__FUNCTION__, x, ##__VA_ARGS__)
+#define cexit(x, ...) cexit_internal(__FUNCTION__, x, ##__VA_ARGS__)
+#define ccrit(x, ...) ccrit_internal(__FUNCTION__, x, ##__VA_ARGS__)
+
+
+
+
 void cinitfd(FILE* stdout_file,FILE* stderr_file); /* set the info(stdout) logfile and the error(stderr) logfile */
 
-void cerror(char* format, ...); /* print error, then return */
+void cerror_internal(const char* calling_function,char* format, ...); /* print error, then return */
 
-void cinfo(char* format, ...); /* print info, then return */
+void cinfo_internal(const char* calling_function,char* format, ...); /* print info, then return */
 
-void cexit(char* format, ...); /* print error, then exit */
+void cexit_internal(const char* calling_function,char* format, ...); /* print error, then exit */
 
-void cdebug(char* format, ...); /* print debug info if DEBUG is defined, then return */
+void cdebug_internal(const char* calling_function,char* format, ...); /* print debug info if DEBUG is defined, then return */
 
-void ccrit(char* format, ...); /* print critical error, then exit */
+void ccrit_internal(const char* calling_function,char* format, ...); /* print critical error, then exit */
 
 #endif /* SSCS_CUSTOM_ERROR_CHK_HFILE */

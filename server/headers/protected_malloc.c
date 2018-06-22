@@ -29,7 +29,7 @@ void sscs_chkaddr(void* ptr,const char* file,int line){
 	if(chv != SSCS_HEAP_MAGIC){
 		cerror(" sscs_chkaddr() header checksum error - Called from %s - line %d\n",file,line);
 		ccrit(" Heap Overflow at address %p likely,exiting \n",orig);
-		#ifdef SSCS_CLIENT_FORK
+	#ifdef SSCS_CLIENT_FORK
 	exit(1);
 #else
 	pthread_exit(NULL);
@@ -123,6 +123,7 @@ unsigned char *gen_rdm_bytestream (size_t num_bytes){  //generate semi-random by
  */
 void* sscs_cmalloc(size_t size,const char* file, int line){
 	cdebug(" Called sscs_cmalloc() (Called from %s-%d)\n",file,line);
+	if(size <= 0)return NULL;
 	size_t origsize = size;
 /*
  * Calculate size to allocate (must be a multiple of PAGESIZE)
@@ -193,13 +194,13 @@ void sscs_cfree(void* ptr,const char* file,int line){
 		return;
 	}
 	void* orig = ptr-21; //go back to original metasize buffer
-	sscs_chkaddr(ptr,__FILE__,__LINE__);
+	sscs_chkaddr(ptr,file,line);
 
 /*
  * We need to calculate the size of the original buffer the way we allocated it so we can reverse the 
  * guard page to avoid some nasty bugs
  */
-	size_t size = sscs_heap_object_size(ptr,__FILE__,__LINE__);
+	size_t size = sscs_heap_object_size(ptr,file,line);
 	size += 40;
 	size_t alloc_len = size + PAGESIZE - (size % PAGESIZE) + PAGESIZE; //calculate original alloc_len
 /*

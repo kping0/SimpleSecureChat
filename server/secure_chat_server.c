@@ -48,6 +48,7 @@
 #include "headers/hashing.h" // hashing implimentation (SHA256(salt+data))
 #include "headers/cstdinfo.h" //custom error & info printing
 #include "headers/simpleconfig.h" //configfile support
+#include "headers/loadconfig.h"
 
 struct sscs_handler_data{
 	int client_socket;
@@ -55,17 +56,26 @@ struct sscs_handler_data{
 	pthread_t* thread_info;	
 };
 
-int sock = 0; //Global listen variable so it can be closed from a signal handler
+/*
+ * Global Variables. Tried to avoid as much as possible but for the listening socket it is neccessary so the signal handler can close it & the configuration pointer needs to be accessed by so many functions
+ * that it makes sense to make it a global
+ */
+int sock = 0; 
+
+SCONFIG* config = NULL; /* Global SimpleConfig configuration */
 
 void* _ClientHandler(void* data);
 
 int main(void){
+	
+     config = loadconfig();	
 
-#ifdef SSCS_LOGTOFILE
-    FILE* stdoutl = freopen(SSCS_LOGFILE,"a+",stdout);
-    FILE* stderrl = freopen(SSCS_LOGFILE,"a+",stderr); 
-    cinitfd(stdoutl,stderrl);
-#endif /* SSCS_LOGTOFILE */
+if(sconfig_get_int(config,"SSCS_LOGTOFILE") == 1){
+	byte* logfilepath = sconfig_get_str(config,"SSCS_LOGFILE");
+	FILE* stdoutl = freopen(logfilepath,"a+",stdout);
+        FILE* stderrl = freopen(logfilepath,"a+",stderr); 
+        cinitfd(stdoutl,stderrl);
+}
     //register signal handlers..
     signal(SIGINT,ssc_sig_handler);
     signal(SIGABRT,ssc_sig_handler);
@@ -102,7 +112,7 @@ int main(void){
 		_hdl_data->client_socket = client;
 		_hdl_data->ctx = ctx;
 		
-	#ifdef SSCS_CLIENT_FORK	
+	if(sconfig_get_int(config,"SSCS_CLIENT_FORK") == 1){
 
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
@@ -112,8 +122,8 @@ int main(void){
 		if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 		
 			_ClientHandler(_hdl_data);
 		}
-
-	#else
+	}
+	else{
 		pthread_t _thr_id;
 		if(pthread_create(&_thr_id,NULL,_ClientHandler,_hdl_data)){
 			cerror(" failed to create thread  %s\n",strerror(errno));
@@ -121,17 +131,13 @@ int main(void){
 			exit(0);
 		}
 
-	#endif /* SSCS_CLIENT_FORK */	
+	}
 	} 
     //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
     cdebug(" Server Main Process is shutting down..\n");
     close(sock);
     SSL_CTX_free(ctx);
     cleanup_openssl();
-#ifdef SSCS_LOGTOFILE
-    fclose(stderrl);
-    fclose(stdoutl);
-#endif /* SSCS_LOGTOFILE */
     return 0;
 }
 void* _ClientHandler(void* data){
@@ -282,10 +288,8 @@ void* _ClientHandler(void* data){
 							}				
 						}
 						SSCS_release(&obj);
-#ifdef SSCS_LOGTOFILE
 						fflush(stdout);
 						fflush(stderr);
-#endif /* SSCS_LOGTOFILE */
 					}
 				}
 				else{
@@ -299,10 +303,8 @@ void* _ClientHandler(void* data){
 				goto end;
 			}
 			SSCS_release(&obj0);
-#ifdef SSCS_LOGTOFILE
 			fflush(stdout);
 			fflush(stderr);
-#endif /* SSCS_LOGTOFILE */
 		}
 	end: //cleanup & exit
 		cdebug(" Ending Client Session\n");
@@ -310,11 +312,11 @@ void* _ClientHandler(void* data){
 		SSL_free(ssl);
 		close(client); 
 		cfree(buf); 
-	#ifdef SSCS_CLIENT_FORK 
+
+	if(sconfig_get_int(config,"SSCS_CLIENT_FORK") == 1)
 		exit(0);
-	#else 
+	else
 		pthread_exit(0);
-	#endif
 	/*
 	* End of Client Handler Code
 	*/

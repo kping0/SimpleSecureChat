@@ -48,6 +48,7 @@
 #include "settings.h"
 #include "base64.h"
 #include "hashing.h"
+#include "simpleconfig.h"
 
 #define UNUSED(x)((void)x)
 
@@ -62,6 +63,7 @@
 #define AUTHUSR 9 //Sent from client to authenticate
 
 extern int sock;
+extern SCONFIG* config;
 
 int create_socket(int port);
 

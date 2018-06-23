@@ -21,26 +21,11 @@
 #define SSC_SETTINGSHFSRV
 
 /*
-* All configurable settings for SSCServer
-*/
+ * Settings for SSCS (compile settings, cannot be changed at runtime)
+ */
 
 /* Miscellaneous */
-//#define DEBUG //uncomment for additional debug info
-#define SSC_VERIFY_VARIABLES //sanity check variables 
-
-/* Settings for MySQL/MariaDB */
-#define SSCDB_SRV "localhost" //mysql server
-#define SSCDB_USR "SSCServer" //mysql username
-#define SSCDB_PASS "passphrase" //mysql password 
-
-/* Log Settings */
-#define SSCS_LOGTOFILE //Keep defined -> stdout&stderr goto SSCS_LOGFILE
-#define SSCS_LOGFILE "SSCServer.log" //Logfile to write to 
-
-/* Certificate file Settings */
-#define SSCS_CERTFILE "cert.pem" //certificate file
-#define SSCS_KEYFILE "key.pem" //Key file
-#define SSCS_KEYFILE_PW "test" //key file password
+//#define DEBUG /* debug information (ALOT) */
 
 /* 
  * Use Custom Malloc or system specific malloc & free
@@ -64,7 +49,7 @@
 /*
  * How to handle each client:
  * forking (New process for each child -> More Secure)
- * threading (Same memory space, new stack -> Better Performance)
+ * DEFAULT: threading (Same memory space, new stack -> Better Performance)
  */
 //#define SSCS_CLIENT_FORK
 

@@ -22,10 +22,10 @@ security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -f
 
 no_warning_flags = -Wno-unused-function -Wno-pointer-sign -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-result #get rid of annoying warnings
 
-flags = $(security_flags) $(no_warning_flags)
+flags = $(security_flags) $(no_warning_flags) -D_GNU_SOURCE
 
-SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o cstdinfo.o simpleconfig.o  
-	gcc $(flags) -o SSCServer base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o cstdinfo.o  `mysql_config --cflags --libs` -lcrypto -lssl
+SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o cstdinfo.o simpleconfig.o loadconfig.o
+	gcc $(flags) -o SSCServer simpleconfig.o loadconfig.o base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o cstdinfo.o  `mysql_config --cflags --libs` -lcrypto -lssl
 	rm -f *.o
 
 main.o: secure_chat_server.c
@@ -51,6 +51,9 @@ cstdinfo.o: headers/cstdinfo.c headers/cstdinfo.h
 
 simpleconfig.o: headers/simpleconfig.c headers/simpleconfig.h
 	gcc $(flags) -o simpleconfig.o -c headers/simpleconfig.c
+
+loadconfig.o: headers/loadconfig.c headers/loadconfig.h
+	gcc $(flags) -o loadconfig.o -c headers/loadconfig.c
 
 clean:
 	rm -f *.o SSCServer* temp 

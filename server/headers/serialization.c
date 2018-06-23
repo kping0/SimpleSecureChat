@@ -122,7 +122,7 @@ int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
 		byte* validationpointer = memseq((byte*)old_buf_ptr,old_buf_size,(byte*)modlabel,modlabel_len);
 		if(validationpointer != NULL){
 			cfree(modlabel);
-			cinfo("SSCS_object_add_data() label '%s' already exists",label);
+			cinfo("label '%s' already exists",label);
 			return -1;
 		}
 	}
@@ -148,8 +148,10 @@ int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
 	size_t new_buf_size = (old_buf_size + final_intermediate_len);
 	void *new_buf_ptr = cmalloc(new_buf_size);
 	memset(new_buf_ptr,0,new_buf_size);
-	if(old_buf_ptr != NULL)memcpy(new_buf_ptr,old_buf_ptr,old_buf_size);
-	cfree(old_buf_ptr);
+	if(old_buf_ptr != NULL){
+		memcpy(new_buf_ptr,old_buf_ptr,old_buf_size);
+		cfree(old_buf_ptr);
+	}
 	old_buf_ptr = NULL;
 	i = 0;
 	byte* base_ptr = new_buf_ptr + old_buf_size ;	
@@ -175,15 +177,14 @@ int SSCS_object_remove_data(sscso* obj,byte* label){
 	sprintf(modlabel,"%s:\"",label);
 	byte* label_data = memseq(buf_ptr,buf_size,(byte*)modlabel,modlabel_len);
 	if(!label_data){
-		cinfo("SSCS_object_remove_data() there is no data associated with the label '%s'",label);
-		cfree(modlabel);
+		cinfo("There is no data associated with the label '%s'",label);
 		return -1;
 	}
 	byte* wptr = label_data + modlabel_len; //start of b64data
 	size_t count_iteration = 0;
 	while(wptr[count_iteration] != '"' && wptr[count_iteration+1] != ';'){ //Run once to get length of string 
 		if(!((wptr+count_iteration)-buf_ptr < (signed)buf_size)){
-			cerror("SSCS_object_remove_data() out of bounds loop");
+			cerror("out of bounds loop");
 			cfree(modlabel);
 			return -1;	
 		}

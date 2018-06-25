@@ -35,9 +35,6 @@
 #define cexit(x, ...) cexit_internal(__FUNCTION__, x, ##__VA_ARGS__)
 #define ccrit(x, ...) ccrit_internal(__FUNCTION__, x, ##__VA_ARGS__)
 
-
-
-
 void cinitfd(FILE* stdout_file,FILE* stderr_file); /* set the info(stdout) logfile and the error(stderr) logfile */
 
 void cerror_internal(const char* calling_function,char* format, ...); /* print error, then return */

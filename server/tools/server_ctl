@@ -1,0 +1,36 @@
+
+#!/bin/bash
+
+#/*
+# *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
+# *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
+# *
+# *  This program is free software: you can redistribute it and/or modify
+# *  it under the terms of the GNU General Public License as published by
+# *  the Free Software Foundation, either version 3 of the License, or
+# *  (at your option) any later version.
+# *
+# *  This program is distributed in the hope that it will be useful,
+# *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+# *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# *  GNU General Public License for more details.
+# *
+# *  You should have received a copy of the GNU General Public License
+# *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# */
+
+
+if [ "$1" == "start" ] || [ "$1" == "START" ];then
+	echo "Starting Server"
+	pkill SSCServer
+	./SSCServer & disown
+elif [ "$1" == "stop" ] || [ "$1" == "STOP" ];then
+	echo "Stopping Server"
+	pkill SSCServer	
+elif [ "$1" == "log" ] || [ "$1" == "LOG" ]; then
+	echo "Showing last 50 lines of log, Ctrl-C to exit"
+	sleep 2
+	watch -n 0.5 tail -n 50 SSCServer.log 
+else
+	echo "Usage: server_ctl.sh [START|STOP|LOG]"
+fi

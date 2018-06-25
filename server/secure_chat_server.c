@@ -112,7 +112,7 @@ if(sconfig_get_int(config,"SSCS_LOGTOFILE") == 1){
 		_hdl_data->client_socket = client;
 		_hdl_data->ctx = ctx;
 		
-	if(sconfig_get_int(config,"SSCS_CLIENT_FORK") == 1){
+	#ifdef SSCS_CLIENT_FORK
 
 	/*
 	* We fork(clone the process) to handle each client. On exit these zombies are handled
@@ -122,8 +122,7 @@ if(sconfig_get_int(config,"SSCS_LOGTOFILE") == 1){
 		if(pid == 0){ //If the pid is 0 we are running in the child process(our designated handler) 		
 			_ClientHandler(_hdl_data);
 		}
-	}
-	else{
+	#else
 		pthread_t _thr_id;
 		if(pthread_create(&_thr_id,NULL,_ClientHandler,_hdl_data)){
 			cerror(" failed to create thread  %s\n",strerror(errno));
@@ -131,7 +130,7 @@ if(sconfig_get_int(config,"SSCS_LOGTOFILE") == 1){
 			exit(0);
 		}
 
-	}
+	#endif
 	} 
     //If while loop is broken close listening socket and do cleanup (This should only be run on the server)
     cdebug(" Server Main Process is shutting down..\n");

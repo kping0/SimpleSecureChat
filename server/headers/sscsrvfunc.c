@@ -49,7 +49,7 @@ void init_DB(void){ //prepare database
 	char* srvhost = sconfig_get_str(config,"SSCDB_SRV");	
 	char* srvuser = sconfig_get_str(config,"SSCDB_USR");
 	char* srvpass = sconfig_get_str(config,"SSCDB_PASS");
-	cinfo("Trying to get a session started with the MySQL server %s(%s)",srvhost,srvuser);
+	cinfo("Trying to get a session started with the MySQL server -- %s::%s",srvhost,srvuser);
 	MYSQL* con = mysql_init(NULL);
 	if(!con){
 		cerror(" %s\n",mysql_error(con));

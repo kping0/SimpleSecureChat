@@ -1,5 +1,4 @@
 
-
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -27,7 +26,9 @@ void cinitfd(FILE* cinfo_out_file,FILE* cinfo_err_file){
 	cinfo_out = cinfo_out_file;
 	cinfo_err = cinfo_err_file;
 	cinfo_check_init = 1;
+#ifdef DEBUG
 	fprintf(cinfo_out_file,"Custom Info & Error Messages Format: [SEVERITY](TIME)->CALLING_FUNCTION() [MESSAGE] \n");
+#endif
 	return;
 }
 void cerror_internal(const char* calling_function,char* format, ...){

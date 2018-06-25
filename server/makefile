@@ -18,21 +18,24 @@
 # *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # */
 
-security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE -Wall -Wextra -Wformat -Wformat-security -O3 -g -Wl,-z,relro,-z,now -lpthread
+security_flags = -D_FORTIFY_SOURCE=2 -fstack-protector-all -fstack-check -pie -fPIE  -O3 -g -Wl,-z,relro,-z,now 
 
 no_warning_flags = -Wno-unused-function -Wno-pointer-sign -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-result #get rid of annoying warnings
 
-flags = $(security_flags) $(no_warning_flags) -D_GNU_SOURCE
+useful_flags = -Wall -Wextra -Wformat -Wformat-security
+
+flags = $(security_flags) $(useful_flags) $(no_warning_flags) -D_GNU_SOURCE
 
 SSCServer: main.o sscsrvfunc.o base64.o serialization.o hashing.o protected_malloc.o cstdinfo.o simpleconfig.o loadconfig.o
 	gcc $(flags) -o SSCServer simpleconfig.o loadconfig.o base64.o sscsrvfunc.o main.o serialization.o hashing.o protected_malloc.o cstdinfo.o  `mysql_config --cflags --libs` -lcrypto -lssl
+	gcc $(flags) -o tools/modconf tools/src/modconf.c base64.o serialization.o protected_malloc.o simpleconfig.o cstdinfo.o
 	rm -f *.o
 
 main.o: secure_chat_server.c
-	gcc $(flags) -o main.o -c secure_chat_server.c `mysql_config --cflags --libs` -lcrypto -lssl
+	gcc $(flags) -o main.o -c secure_chat_server.c `mysql_config --cflags --libs` -lcrypto -lssl -lpthread
 
 sscsrvfunc.o: headers/sscsrvfunc.h headers/sscsrvfunc.c
-	gcc $(flags) -o sscsrvfunc.o -c headers/sscsrvfunc.c `mysql_config --cflags --libs` -lssl -lcrypto
+	gcc $(flags) -o sscsrvfunc.o -c headers/sscsrvfunc.c `mysql_config --cflags --libs` -lssl -lcrypto -lpthread
 
 serialization.o: headers/serialization.c headers/serialization.h
 	gcc $(flags) -o serialization.o -c headers/serialization.c
@@ -56,21 +59,20 @@ loadconfig.o: headers/loadconfig.c headers/loadconfig.h
 	gcc $(flags) -o loadconfig.o -c headers/loadconfig.c
 
 clean:
-	rm -f *.o SSCServer* temp 
+	rm -f *.o SSCServer* temp tools/modconf
 gitprep: clean
 	rm -rf README.md headers/README.md ../README.md cert.pem key.pem
 
-mysqlprep:
-	echo "This needs to be run with Root!"
+debug_mysqlprep:
+	#This needs to be run with Root!
 	sudo service mysqld start
 	sudo mysql -u root -e "CREATE USER 'SSCServer'@'localhost' IDENTIFIED BY 'passphrase'"
 	sudo mysql -u root -e "GRANT ALL PRIVILEGES ON *.* to 'SSCServer'@'localhost' IDENTIFIED BY 'passphrase'"
 
 debiandeps:
-	echo "Needs to be run with root!"
-	sudo apt-get install mariadb-server libmariadb-dev default-libmysqlclient-dev libssl-dev 
-
+	#This needs to be run with root!
+	sudo apt-get install mariadb-server libmariadb-dev default-libmysqlclient-dev libssl-dev gcc make build-essential
 fedoradeps:
 	echo "Needs to be run with root!"
-	sudo yum install mariadb-server mariadb-common mariadb-config mariadb-devel mariadb-libs mariadb-server-utils openssl-libs 
-
+	sudo yum groupinstall "Development Tools"
+	sudo yum install mariadb-server mariadb-common mariadb-config mariadb-devel mariadb-libs mariadb-server-utils openssl-libs gcc make 

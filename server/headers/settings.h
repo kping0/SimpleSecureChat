@@ -21,22 +21,19 @@
 #define SSC_SETTINGSHFSRV
 
 /*
- * Settings for SSCS (compile settings, cannot be changed at runtime)
+ * Settings for SSCServer (compile settings, cannot be changed at runtime)
  */
 
-/* Miscellaneous */
-//#define DEBUG /* debug information (ALOT) */
+//#define DEBUG /* print debug information (ALOT!) */
 
-/* 
- * Use Custom Malloc or system specific malloc & free
- * NOTE: The custom malloc has a HUGE ~4KB overhead per allocation due to a Guard Page protecting 
- * against Heap Overflows
- *
- * Better-performance -> Use Default Malloc 
- * Security -> Use Custom Malloc
- */
+//#define SSCS_CLIENT_FORK /* uncomment if you want to have SSCS fork() for every client */
 
 #define SSCS_CUSTOM_MALLOC /* comment out to use the system specific malloc & free */
+
+
+/* DO NOT EDIT BEYOND THIS LINE */
+/* DO NOT EDIT BEYOND THIS LINE */
+/* DO NOT EDIT BEYOND THIS LINE */
 
 #ifdef SSCS_CUSTOM_MALLOC
 	#include "protected_malloc.h"
@@ -45,12 +42,5 @@
 	#define cfree(ptr) free(ptr) 
 	#define cmalloc_init() puts("") 
 #endif
-
-/*
- * How to handle each client:
- * forking (New process for each child -> More Secure)
- * DEFAULT: threading (Same memory space, new stack -> Better Performance)
- */
-//#define SSCS_CLIENT_FORK
 
 #endif /* SSC_SETTINGSHFSRV */

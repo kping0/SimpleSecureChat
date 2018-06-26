@@ -15,7 +15,8 @@ ChangeLog
 NEWS
 build-aux/
 configure
-sscclient
+ssc_client
+ssc_client_config
 temp
 .travis.yml
 autom4te.cache

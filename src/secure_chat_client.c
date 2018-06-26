@@ -65,8 +65,6 @@ gboolean timedupdate_gui(void* data){
 
 #endif /* SSC_GUI */
 
-#define UNUSED(x)((void)x)
-
 int pexit(byte* error){
 	fprintf(stderr,"[ERROR] %s\n",error);
 	exit(EXIT_FAILURE);

@@ -150,7 +150,7 @@ int sconfig_get_int_internal(SCONFIG* obj,char* label,const char* file,int line)
 	cdebug("%s called",__FUNCTION__);
 	sscsd* data = sconfig_get_full_internal(obj,label,file,line);
 	if(data == NULL){
-		cerror("sconfig_get_int() could not retrieve data ");
+		cerror("sconfig_get_int() could not retrieve data for label '%s'",label);
 		SSCS_data_release(&data);
 		return -1;
 	}

@@ -33,7 +33,7 @@ typedef unsigned char byte;
 
 
 /* Uncomment below for debug information */
-#define DEBUG 
+/* #define DEBUG// */
 
 /*
  * By default SSC spawns a seperate thread to get new messages from the server, to disable this 
@@ -42,6 +42,8 @@ typedef unsigned char byte;
 #define SSC_UPDATE_THREAD
 #define SSC_UPDATE_INTERVAL 1000 /* if using update thread, time between updates in ms */
 
+/* Do you want to have the option to use the gui ? (comment out if you do NOT) */
+#define SSC_GUI
 
 
 /* DO NOT EDIT BELOW THIS LINE */
@@ -49,7 +51,7 @@ typedef unsigned char byte;
 /* DO NOT EDIT BELOW THIS LINE */
 
 #define DEFAULT_HOST_NAME "52.14.103.245" /* default server ip */
-//#define RELEASE_IMAGE 
+/* #define RELEASE_IMAGE// */
 
 /* some macros for compatibility */
 #define cmalloc(x) calloc(1,x)

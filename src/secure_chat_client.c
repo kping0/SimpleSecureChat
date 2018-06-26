@@ -41,19 +41,19 @@
 #include <sqlite3.h> 
 
 /* Custom Header */
-#include "headers/sscssl.h" //Connection functions
-#include "headers/sscasymmetric.h" //keypair functions
-#include "headers/sscdbfunc.h" //DB manipulation functions 
-#include "headers/base64.h" //Base64 Functions
-#include "headers/serialization.h" //SimpleSecureSerialization library (to replace binn)
-#include "headers/msgfunc.h" //encrypt-decrypt-verify-sign functions
-#include "headers/settings.h" //Modify to change configuration of SSC
-#include "headers/cli.h" //cli functions
-#include "headers/thread_locking.h" //thread locking code
+#include "sscssl.h" //Connection functions
+#include "sscasymmetric.h" //keypair functions
+#include "sscdbfunc.h" //DB manipulation functions 
+#include "base64.h" //Base64 Functions
+#include "serialization.h" //SimpleSecureSerialization library (to replace binn)
+#include "msgfunc.h" //encrypt-decrypt-verify-sign functions
+#include "settings.h" //Modify to change configuration of SSC
+#include "cli.h" //cli functions
+#include "thread_locking.h" //thread locking code
 
 #ifdef SSC_GUI
 #include <gtk/gtk.h>
-#include "headers/gui.h"
+#include "gui.h"
 
 gboolean timedupdate_gui(void* data){
 	clear_messages_gui(data);	

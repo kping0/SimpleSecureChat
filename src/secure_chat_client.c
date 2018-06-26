@@ -70,9 +70,7 @@ int pexit(byte* error){
 	exit(EXIT_FAILURE);
 }
 
-/*
- * Start of client 
- */
+/* Start of application */
 int main(void){
 	fprintf(stdout,"Welcome to %s. Report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
 /*  Init OpenSSL Library */

@@ -74,17 +74,8 @@ int pexit(byte* error){
  * Start of client 
  */
 int main(void){
-	fprintf(stdout,"[INFO] Starting secure chat application...\n[INFO] Get the source at: ('https://github.com/kping0/simplesecurechat/client')\n[INFO] Host your own server with ('https://github.com/kping0/simplesecurechat/server')\n");
-/*
-	char* home_dir = secure_getenv("HOME");
-	char* data_dir = calloc(1,strlen(home_dir) + 17);
-	sprintf(data_dir,"%s/.ssc_personal/",home_dir);
-	if(mkdir(data_dir, S_IRUSR | S_IWUSR | S_IXUSR) && errno != EEXIST){
-		fprintf(stderr,"[ERROR] Could not create ~/.ssc_personal/ (errno == %d)\n",errno);
-		exit(EXIT_FAILURE);
-	}
-*/
-	/*  Init OpenSSL Library */
+	fprintf(stdout,"Welcome to %s. Please report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
+/*  Init OpenSSL Library */
 	(void)SSL_library_init(); 
 	SSL_load_error_strings(); 
 	init_locks(); /* enable OpenSSL thread-safety (via pthread_mutexes) */

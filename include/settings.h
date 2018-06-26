@@ -23,7 +23,7 @@
 
 #ifndef SSC_SETTINGSHF
 #define SSC_SETTINGSHF
-
+#include <../config.h>
 typedef unsigned char byte;
 
 /* Uncomment below for debug information */

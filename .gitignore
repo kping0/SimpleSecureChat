@@ -19,3 +19,4 @@ sscclient
 temp
 .travis.yml
 autom4te.cache
+COPYING

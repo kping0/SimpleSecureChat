@@ -18,7 +18,7 @@
  */
 
 /*
-* This file contains all the configurable settings for SimpleSecureChat (Client)
+* This file contains all the compile settings for SimpleSecureChat (Client)
 */
 
 #ifndef SSC_SETTINGSHF
@@ -26,33 +26,35 @@
 #include <../config.h>
 typedef unsigned char byte;
 
+/* DO NOT EDIT ABOVE THIS LINE */
+/* DO NOT EDIT ABOVE THIS LINE */
+/* DO NOT EDIT ABOVE THIS LINE */
+
+
+
 /* Uncomment below for debug information */
-//#define DEBUG 
-
-/* Comment out if you want to use your own server */
-//#define _USE_DEFAULT_SERVER
-
-#ifdef _USE_DEFAULT_SERVER
-	#include "../default/default_server.h"
-#else
-	#define HOST_NAME "127.0.0.1"
-	#define HOST_PORT "5050"
-	#define HOST_CERT "public.pem"
-#endif /* _USE_DEFAULT_SERVER */
-
-#define PUB_KEY "rsapublickey.pem" //Public Key location (Will be generated if not found)
-#define PRIV_KEY "rsaprivatekey.pem" //Private Key location (Will be generated if not found)
-#define KEYSIZE 2048 //keysize used to generate key (has to be 1024,2048,4096,or 8192)
-
-#define DB_FNAME "sscdb.db" //SQLITE Database Filename(Will be generated if not found)
+#define DEBUG 
 
 /*
  * By default SSC spawns a seperate thread to get new messages from the server, to disable this 
  * feature comment out the line below (SSC_UPDATE_THREAD)
- * if not using a seperate thread, updates will be done by ssc_cli_msg_upd() (in headers/cli.c) 
- * at a set interval
  */
 #define SSC_UPDATE_THREAD
-#define SSC_UPDATE_INTERVAL 1000 //only applicable if using a seperate update thread
+#define SSC_UPDATE_INTERVAL 1000 /* if using update thread, time between updates in ms */
+
+
+
+/* DO NOT EDIT BELOW THIS LINE */
+/* DO NOT EDIT BELOW THIS LINE */
+/* DO NOT EDIT BELOW THIS LINE */
+
+#define DEFAULT_HOST_NAME "52.14.103.245" /* default server ip */
+//#define RELEASE_IMAGE 
+
+/* some macros for compatibility */
+#define cmalloc(x) calloc(1,x)
+#define cfree(x) free(x)
+#define mitbase64_decode(x,y,z) base64_decode(x,y,z)
+#define mitbase64_encode(x,y,z) base64_encode(x,y,z)
 
 #endif

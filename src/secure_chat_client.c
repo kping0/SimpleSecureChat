@@ -50,6 +50,8 @@
 #include "settings.h" //Modify to change configuration of SSC
 #include "cli.h" //cli functions
 #include "thread_locking.h" //thread locking code
+#include "simpleconfig.h" //config support
+#include "loadconfig_client.h" //function to load config
 
 #ifdef SSC_GUI
 #include <gtk/gtk.h>
@@ -73,21 +75,35 @@ int pexit(byte* error){
 /* Start of application */
 int main(void){
 	fprintf(stdout,"Welcome to %s. Report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
+
+	SCONFIG* config = loadconfig_client(); /* get config info */
+	if(!config)cexit("could not retrieve configuration");
+
 /*  Init OpenSSL Library */
 	(void)SSL_library_init(); 
 	SSL_load_error_strings(); 
 	init_locks(); /* enable OpenSSL thread-safety (via pthread_mutexes) */
 
 	/* Connect to server */
+	char* hostcert = sconfig_get_str(config,"HOST_CERT");
+	char* hostname = sconfig_get_str(config,"HOST_NAME");
+	char* hostport = sconfig_get_str(config,"HOST_PORT"); /* later turned into int */
+	cinfo("Trying to connect to %s:%s",hostname,hostport);
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
-	if(tls_conn(tls_vars,HOST_CERT,HOST_NAME,HOST_PORT)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
+	if(tls_conn(tls_vars,hostcert,hostname,hostport)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
 		fprintf(stdout,"[INFO] SSL/TLS OK\n");
-		fprintf(stdout,"[INFO] Connected to " HOST_NAME ":" HOST_PORT " using server-cert: %s \n", HOST_CERT);
+		fprintf(stdout,"[INFO] Connected to %s:%s using server-cert: %s \n",hostname,hostport,hostcert );
+		free(hostcert);
+		free(hostname);
+		free(hostport);
 	}
 	else{
 		fprintf(stderr,"[ERROR] SSL/TLS ERROR\n");	
 		fprintf(stderr,"[ERROR] Exiting, cannot establish connection with server\n");
 		free(tls_vars);
+		free(hostcert);
+		free(hostname);
+		free(hostport);
 		exit(1);
 	}
 	/*
@@ -95,11 +111,15 @@ int main(void){
 	 */
 	EVP_PKEY* pubk_evp = EVP_PKEY_new(); 
 	EVP_PKEY* priv_evp = EVP_PKEY_new();
-	if(!load_keypair(pubk_evp,priv_evp,PUB_KEY,PRIV_KEY)){
-		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",KEYSIZE);
+	char* pub_key_path = sconfig_get_str(config,"PUB_KEY");
+	char* priv_key_path = sconfig_get_str(config,"PRIV_KEY");
+	cdebug("key paths %s -- %s",pub_key_path,priv_key_path);
+	int keysize_rsa = sconfig_get_int(config,"KEYSIZE");
+	if(!load_keypair(pubk_evp,priv_evp,pub_key_path,priv_key_path)){
+		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",keysize_rsa);
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
-		create_keypair(PUB_KEY,PRIV_KEY,KEYSIZE);
+		create_keypair(pub_key_path,priv_key_path,keysize_rsa);
 		fprintf(stdout,"[INFO] Generated Keypair\nPlease restart the binary to load your keypair\n");
 		return 0;
 	}
@@ -107,8 +127,9 @@ int main(void){
 		fprintf(stdout,"[INFO] Loaded Keypair OK\n");
 		assert(test_keypair(pubk_evp,priv_evp) == 1);
 	}
-	//Load SQLITE Database
-	sqlite3 *db = init_db(DB_FNAME);
+//Load SQLITE Database
+	char* db_path = sconfig_get_str(config,"DB_FNAME");
+	sqlite3 *db = init_db(db_path);
 	if(db != NULL){
 		fprintf(stdout,"[INFO] Loaded User OK\n");
 	}
@@ -116,10 +137,12 @@ int main(void){
 		fprintf(stderr,"[ERROR] Loading db ERROR\n");
 		goto CLEANUP;	
 	}
-	if(db_user_init(db,PUB_KEY) != 1){
+	if(db_user_init(db,pub_key_path) != 1){
 		fprintf(stderr,"[ERROR] Usercheck ERROR\n");
 		goto CLEANUP;
 	}
+	free(priv_key_path);
+	free(pub_key_path);
 #ifdef DEBUG
 	fprintf(stdout,"[INFO] Starting Signing/Verifying Test\n");
 	const byte msg[] = "This is a secret message";

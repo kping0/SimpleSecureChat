@@ -561,9 +561,6 @@ void ssc_cli_msg_upd(SSCGV* gv,byte* username){
 	free(recvbuf);
 #endif /* !SSC_UPDATE_THREAD */
 	int currentuserUID = get_user_uid(current_user,db);
-#ifdef DEBUG
-	fprintf(stdout,"DEBUG: Current user %s has id %i\n",current_user,currentuserUID);
-#endif
 	if(currentuserUID == -1)return;
 	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 OR uid2=?2",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,currentuserUID);

@@ -1,6 +1,9 @@
 #ifndef SSCS_SERIALIZATION
 #define SSCS_SERIALIZATION
 
+#include "settings.h"
+#include "cstdinfo.h"
+
 struct SSCS_struct{ //SSCS_object
 	void* buf_ptr; //Pointer to current buffer
 	size_t allocated; //Size of current buffer (allocated amount)
@@ -68,7 +71,9 @@ int SSCS_object_int(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
 double SSCS_object_double(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
-byte* SSCS_object_string(sscso* obj,byte* label); //wrapper around SSCS_object_data
+unsigned char* SSCS_object_string(sscso* obj,byte* label); //wrapper around SSCS_object_data
 
+int SSCS_object_remove_data(sscso* obj,byte* label);
+	
 #endif /* SSCS_SERIALIZATION */
 

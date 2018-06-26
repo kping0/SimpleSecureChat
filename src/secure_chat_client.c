@@ -74,7 +74,7 @@ int pexit(byte* error){
  * Start of client 
  */
 int main(void){
-	fprintf(stdout,"Welcome to %s. Please report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
+	fprintf(stdout,"Welcome to %s. Report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
 /*  Init OpenSSL Library */
 	(void)SSL_library_init(); 
 	SSL_load_error_strings(); 

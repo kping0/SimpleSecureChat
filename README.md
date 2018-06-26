@@ -1,13 +1,13 @@
 <h1>SimpleSecureChat</h1>
  <h4>SimpleSecureChat is a simple, end to end encrypted opensource messaging application that minimizes dependencies & exposure and maximizes security & simplicity. The code is meant to be easy to read and understand. Currently the Client and Server code combined is less than 10,000 lines.</h4>
   
-<h2>Building and Configuration of Client & Server</h2>
+<h2>Building and Configuration of Client</h2>
   Go to our Wiki page https://github.com/kping0/SimpleSecureChat/wiki
 <h2> Bug reports </h2>
   Please report any security critical bugs to 'kping0@protonmail.com'
 <h2>License Header</h2>
 
-  SimpleSecureChat Client/Server - E2E encrypted messaging application written in C
+  SimpleSecureChat Client - E2E encrypted messaging application written in C
   
   Copyright (C) 2017-2018 The SimpleSecureChat Authors. (kping0)
 

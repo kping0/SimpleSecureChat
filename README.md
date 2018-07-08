@@ -4,7 +4,7 @@
 <h2>Building and Configuration of Client</h2>
   Go to our Wiki page https://github.com/kping0/SimpleSecureChat/wiki
 <h2> Bug reports </h2>
-  Please report any security critical bugs to 'kping0@protonmail.com'
+  Please report any bugs to 'kping0@protonmail.com'
 <h2>License Header</h2>
 
   SimpleSecureChat Client - E2E encrypted messaging application written in C

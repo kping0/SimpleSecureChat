@@ -5,6 +5,8 @@
   Go to our Wiki page https://github.com/kping0/SimpleSecureChat/wiki
 <h2> Bug reports </h2>
   Please report any bugs to 'kping0@protonmail.com'
+<h2> Credits </h2>
+  Logo by dee-y - https://github.com/dee-y 
 <h2>License Header</h2>
 
   SimpleSecureChat Client - E2E encrypted messaging application written in C

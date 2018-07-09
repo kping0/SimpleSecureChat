@@ -80,9 +80,9 @@ sqlite3* init_db(char* dbfname){
 	sql = NULL;
 	sqlite3_prepare_v2(db,"select * from messages where msgid=0",-1,&stmt,NULL);
 	if(sqlite3_step(stmt) == SQLITE_ROW){
-		puts("Loaded SQLITE OK");
+		cdebug("Loaded Sqlite DB");
 	}else{
-		puts("Loaded SQLITE ERROR");
+		cerror("Could not load DB");
 		return NULL;			
 	}
 	sqlite3_finalize(stmt);	

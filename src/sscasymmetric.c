@@ -17,23 +17,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-
-#include <openssl/ssl.h>
-#include <openssl/crypto.h> 
-#include <openssl/bn.h>
-#include <openssl/rsa.h>
-#include <openssl/conf.h>
-#include <openssl/evp.h>
-#include <openssl/err.h> 
-#include <openssl/rand.h> 
-#include <openssl/bio.h>
-#include <openssl/pem.h>
-
-#include <sqlite3.h> 
+#include "sscasymmetric.h"
 
 typedef unsigned char byte;
 
@@ -173,10 +157,10 @@ int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of ho
 	unsigned char* dec_buf = malloc(2000);
 	/*int dec_len =*/ envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
 	if(strncmp((const char*)msg,(const char*)dec_buf,strlen((const char*)msg)) == 0){
-		puts("Keypair Test OK");	
+		cdebug("Keypair Test Success");
 	}
 	else{
-		puts("Keypair Test ERROR");
+		cerror("Keypair Test Failed!");
 		return 0;
 	}
 	return 1;

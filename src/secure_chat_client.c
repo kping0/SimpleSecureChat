@@ -66,7 +66,7 @@ gboolean timedupdate_gui(void* data){
 #endif /* SSC_GUI */
 
 int pexit(byte* error){
-	fprintf(stderr,"[ERROR] %s\n",error);
+	cerror("Exiting: %s",error);
 	exit(EXIT_FAILURE);
 }
 
@@ -75,7 +75,7 @@ int main(void){
 	fprintf(stdout,"Welcome to %s. Report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
 
 	SCONFIG* config = loadconfig_client(); /* get config info */
-	if(!config)cexit("could not retrieve configuration");
+	if(!config)cexit("Could not retrieve configuration");
 
 /*  Init OpenSSL Library */
 	(void)SSL_library_init(); 
@@ -86,18 +86,16 @@ int main(void){
 	char* hostcert = sconfig_get_str(config,"HOST_CERT");
 	char* hostname = sconfig_get_str(config,"HOST_NAME");
 	char* hostport = sconfig_get_str(config,"HOST_PORT"); /* later turned into int */
-	cinfo("Trying to connect to %s:%s",hostname,hostport);
+	cdebug("Trying to connect to %s:%s",hostname,hostport);
 	struct ssl_str *tls_vars = malloc(sizeof(struct ssl_str));
 	if(tls_conn(tls_vars,hostcert,hostname,hostport)){ /*function that creates a TLS connection & alters the struct(ssl_str)ssl_o*/
-		fprintf(stdout,"[INFO] SSL/TLS OK\n");
-		fprintf(stdout,"[INFO] Connected to %s:%s using server-cert: %s \n",hostname,hostport,hostcert );
+		cdebug("Successfully connected to %s:%s (server) ",hostname,hostport);
 		free(hostcert);
 		free(hostname);
 		free(hostport);
 	}
 	else{
-		fprintf(stderr,"[ERROR] SSL/TLS ERROR\n");	
-		fprintf(stderr,"[ERROR] Exiting, cannot establish connection with server\n");
+		cerror("Failed to connect to server");
 		free(tls_vars);
 		free(hostcert);
 		free(hostname);
@@ -114,56 +112,57 @@ int main(void){
 	cdebug("key paths %s -- %s",pub_key_path,priv_key_path);
 	int keysize_rsa = sconfig_get_int(config,"KEYSIZE");
 	if(!load_keypair(pubk_evp,priv_evp,pub_key_path,priv_key_path)){
-		fprintf(stderr,"[ERROR] Loaded Keypair ERROR\nGenerating %i bit Keypair, this can take up to 5 minutes!\n",keysize_rsa);
+		cerror("Could not load keypair, generating new one -- this can take a while...");
 		EVP_PKEY_free(pubk_evp);
 		EVP_PKEY_free(priv_evp);
 		create_keypair(pub_key_path,priv_key_path,keysize_rsa);
-		fprintf(stdout,"[INFO] Generated Keypair\nPlease restart the binary to load your keypair\n");
+		cinfo("Generated keypair, please restart SimpleSecureChat to load it");
 		return 0;
 	}
 	else {
-		fprintf(stdout,"[INFO] Loaded Keypair OK\n");
+		cdebug("Successfully loaded keypair from disk");
 		assert(test_keypair(pubk_evp,priv_evp) == 1);
 	}
 //Load SQLITE Database
 	char* db_path = sconfig_get_str(config,"DB_FNAME");
 	sqlite3 *db = init_db(db_path);
 	if(db != NULL){
-		fprintf(stdout,"[INFO] Loaded User OK\n");
+		cdebug("Successfully loaded DB");
 	}
 	else{
-		fprintf(stderr,"[ERROR] Loading db ERROR\n");
+		cerror("Could not load Database");
 		goto CLEANUP;	
 	}
 	if(db_user_init(db,pub_key_path) != 1){
-		fprintf(stderr,"[ERROR] Usercheck ERROR\n");
+		cerror("Failed to init userinfo in database");
 		goto CLEANUP;
 	}
 	free(priv_key_path);
 	free(pub_key_path);
 #ifdef DEBUG
-	fprintf(stdout,"[INFO] Starting Signing/Verifying Test\n");
+	cinfo("Starting Debug Sign/Verify test");
 	const byte msg[] = "This is a secret message";
 	byte *sig = NULL;
 	size_t slen = 0;
 	int rc = sign_msg(msg,sizeof(msg),&sig,&slen,priv_evp);
 	if(rc == 0) {
-       		 fprintf(stdout,"[INFO] Created signature\n");
+		 cinfo("Successfully created signature");
     	} else {
-       		 fprintf(stderr,"[ERROR] Failed to create signature, return code %d\n", rc);
+		 cerror("Failed to create signature, return  code %d",rc);
    	}
 	rc = verify_msg(msg,sizeof(msg),sig,slen,pubk_evp);
 	if(rc == 0){
-		fprintf(stdout,"[INFO] Verified Signature");
+		cinfo("Successfully verified signature");
 	}	
 	else{
-		fprintf(stderr,"[ERROR] failed to verify signature");
+		cerror("Failed to verify signature");
 	}
-#endif /* DEBUG */
-	
-//register your user
 
-	fprintf(stdout,"[INFO] Your username is: %s, trying to register it with the server\n",get_muser(db));
+	//register your user
+	char* your_username_for_debug = get_muser(db); /* terrible variable name :) */
+	cinfo("Your username is %s, syncing it with the server",your_username_for_debug);
+	free(your_username_for_debug);
+#endif /* DEBUG*/
 	byte* regubuf = (byte*)register_user_str(db);
 	assert(regubuf != NULL && strlen((const char*)regubuf) > 0);
 	BIO_write(tls_vars->bio_obj,regubuf,strlen((const char*)regubuf)); 
@@ -171,13 +170,13 @@ int main(void){
 	memset(rsp,0,3);			
 	BIO_read(tls_vars->bio_obj,rsp,3);
 	if(strncmp((const char*)rsp,"ERR",3) == 0){
-		fprintf(stderr,"[ERROR] Failed to register user, maybe user exits on server side ?\n");
+		cdebug("Failed to register user (maybe user exists on server?) ");
 	}
 	free(regubuf);
 
 //Authenticate USER
 	byte* authmsg = auth_usr(db);
-	fprintf(stdout,"[INFO] Trying to authenticate your user\n");
+	cdebug("Authenticating your user...");
 	assert(authmsg != NULL && strlen((const char*)authmsg) > 0);
 	BIO_write(tls_vars->bio_obj,authmsg,strlen((const char*)authmsg));
 	free(authmsg);
@@ -194,7 +193,7 @@ int main(void){
 	/*
 	* Setting up gui variables
 	*/
-		fprintf(stdout,"[INFO] Starting GUI...");
+		cdebug("Starting Gui...");
 		struct sscs_backend_variables* backend_vars = malloc(sizeof(struct sscs_backend_variables));
 		backend_vars->pubkey = pubk_evp;
 		backend_vars->privkey = priv_evp;
@@ -439,7 +438,7 @@ int main(void){
 
 /*Clean up objects in memory */
 CLEANUP:
-	fprintf(stdout,"[INFO] Cleaning up Objects...\n");	
+	cinfo("Cleaning up Objects... Exiting SimpleSecureChat");
 	sqlite3_close(db);
 	EVP_PKEY_free(pubk_evp);
 	EVP_PKEY_free(priv_evp);

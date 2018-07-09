@@ -47,6 +47,7 @@
 #include "sscdbfunc.h" //DB manipulation functions 
 #include "base64.h" //Base64 Functions
 #include "serialization.h" //SimpleSecureSerialization library (to replace binn)
+#include "cstdinfo.h" // custom printing to log
 //All configurable settings
 #include "settings.h" //Modify to change configuration of SSC
 

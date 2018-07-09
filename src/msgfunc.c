@@ -21,14 +21,14 @@
 
 byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 	if(strlen((byte*)message) > 1024){
-		fprintf(stderr,"Message too long(limit 1024)\n");
+		cerror("Message to long to send (limit is 1024 characters)");
 		return NULL;	
 	}
 	sscso* obj = SSCS_object();
 	SSCS_object_add_data(obj,"recipient",(byte*)username,strlen((byte*)username));
 	EVP_PKEY* userpubk = get_pubk_username(username,db);
 	if(userpubk == NULL){
-		fprintf(stderr,"Could not get Users Public Key, maybe not in DB?\n");
+		cerror("Could not retrieve the specified public key, maybe not in DB? (try adding the user) ");
 		SSCS_release(&obj);
 		EVP_PKEY_free(userpubk);
 		return NULL;
@@ -40,7 +40,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 	byte* iv = malloc(EVP_MAX_IV_LENGTH);
 	RAND_poll();  
 	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
-		fprintf(stderr,"Error getting CS-RNG for IV\n");	
+		cerror("Message Encryption could not get a random IV");
 		return NULL;	
 	}
 	RAND_poll();
@@ -54,7 +54,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 	size_t sigl = 0;
 	int rc = sign_msg(sigmsg->buf_ptr,sigmsg->allocated,&sig,&sigl,signingKey); //Create Signature for message+recipient
 	if(!(rc == 0)){
-		fprintf(stderr,"error signing message\n");
+		cerror("Could not digitally sign message");
 		SSCS_release(&sigmsg);
 		SSCS_release(&obj);
 		free(iv);
@@ -70,7 +70,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 	//Encrypt message 
 	int enc_len = envelope_seal(&userpubk,(byte*)SSCS_object_encoded(sigmsg2),SSCS_object_encoded_size(sigmsg2),&ek,&ekl,iv,enc_buf);
 	if(enc_len <= 0){
-		fprintf(stderr,"Error Encrypting Message!\n");
+		cerror("Could not Encrypt Message!");
 		return NULL;	
 	}
 	int message_purpose = MSGSND;
@@ -94,7 +94,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 	
 byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
 	if(encrypted_buffer == NULL){
-		fprintf(stderr,"Error decrypting\n");
+		cinfo("encrypted_buffer passed is NULL, returning NULL");
 		return NULL;	
 	}
 	sscso* obj = SSCS_open((byte*)encrypted_buffer);
@@ -125,7 +125,7 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	byte* sender = (byte*)SSCS_object_string(obj,"sender");
 	EVP_PKEY *userpubk = get_pubk_username(sender,db);
 	if(!userpubk){
-		fprintf(stderr,"error retrieving public key for %s",sender);	
+		cerror("Could not retrieve public key for %s. Could not verify signature - Abort.",sender);
 		free(sender);	
 		free(dec_buf);
 		SSCS_release(&obj);
@@ -139,7 +139,7 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	}
 	sscsd* sig_data = SSCS_object_data(obj2,"sig");
 	if(!sig_data){
-		fprintf(stderr,"error retrieving public key for %s",sender);	
+		cerror("Could not retrieve signature data from received object - Abort.");
 		free(sender);	
 		free(dec_buf);
 		SSCS_release(&obj);
@@ -156,14 +156,20 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	int rc = verify_msg(serializedobj3,serializedobj3l,sig,sigl,userpubk);
 
 	if(rc == 0){
-#ifdef DEBUG
-		fprintf(stdout,"Verified Signature\n");
-#endif
+		cdebug("Signature Verified!");
 	}	
 	else{
-#ifdef DEBUG
-		fprintf(stderr,"failed to verify signature\n");
-#endif
+		cerror("Signature could not be verified - Abort.");	
+		SSCS_release(&obj);
+		SSCS_release(&obj2);
+		SSCS_release(&obj3);	
+		SSCS_data_release(&sig_data);
+		SSCS_data_release(&serializedobj3_data);
+		SSCS_data_release(&ek_data);
+		SSCS_data_release(&enc_buf_data);
+		SSCS_data_release(&iv_data);
+		free(sender);	
+		EVP_PKEY_free(userpubk);
 		return NULL;
 	}
 
@@ -209,35 +215,35 @@ int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* p
         ctx = EVP_MD_CTX_create();
         assert(ctx != NULL);
         if(ctx == NULL) {
-            fprintf(stderr,"EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         const EVP_MD* md = EVP_get_digestbyname("SHA256");
         assert(md != NULL);
         if(md == NULL) {
-            fprintf(stderr,"EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         int rc = EVP_DigestInit_ex(ctx, md, NULL);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         rc = EVP_DigestSignInit(ctx, NULL, md, NULL, pkey);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         rc = EVP_DigestSignUpdate(ctx, msg, mlen);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
@@ -245,20 +251,20 @@ int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* p
         rc = EVP_DigestSignFinal(ctx, NULL, &req);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         assert(req > 0);
         if(!(req > 0)) {
-            fprintf(stderr,"EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         *sig = OPENSSL_malloc(req);
         assert(*sig != NULL);
         if(*sig == NULL) {
-            fprintf(stderr,"OPENSSL_malloc failed, error 0x%lx\n", ERR_get_error());
+            cerror("OPENSSL_malloc failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
@@ -266,13 +272,13 @@ int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* p
         rc = EVP_DigestSignFinal(ctx, *sig, slen);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestSignFinal failed (3), return code %d, error 0x%lx\n", rc, ERR_get_error());
+            cerror("EVP_DigestSignFinal failed (3), return code %d, error 0x%lx\n", rc, ERR_get_error());
             break; /* failed */
         }
         
         assert(req == *slen);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, *slen);
+            cerror("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, *slen);
             break; /* failed */
         }
         
@@ -309,35 +315,35 @@ int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_P
         ctx = EVP_MD_CTX_create();
         assert(ctx != NULL);
         if(ctx == NULL) {
-            fprintf(stderr,"EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         const EVP_MD* md = EVP_get_digestbyname("SHA256");
         assert(md != NULL);
         if(md == NULL) {
-            fprintf(stderr,"EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         int rc = EVP_DigestInit_ex(ctx, md, NULL);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         rc = EVP_DigestVerifyInit(ctx, NULL, md, NULL, pkey);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestVerifyInit failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestVerifyInit failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
         rc = EVP_DigestVerifyUpdate(ctx, msg, mlen);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestVerifyUpdate failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestVerifyUpdate failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         
@@ -347,7 +353,7 @@ int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_P
         rc = EVP_DigestVerifyFinal(ctx, sig, slen);
         assert(rc == 1);
         if(rc != 1) {
-            fprintf(stderr,"EVP_DigestVerifyFinal failed, error 0x%lx\n", ERR_get_error());
+            cerror("EVP_DigestVerifyFinal failed, error 0x%lx\n", ERR_get_error());
             break; /* failed */
         }
         

@@ -41,9 +41,13 @@
 #define cerror(x, ...) cerror_internal(__FILE__,__LINE__,__FUNCTION__, x, ##__VA_ARGS__)
 #define cexit(x, ...) cexit_internal(__FILE__,__LINE__,__FUNCTION__, x, ##__VA_ARGS__)
 #define ccrit(x, ...) ccrit_internal(__FILE__,__LINE__,__FUNCTION__, x, ##__VA_ARGS__)
-
+#define cfunction_info() cfunction_info_internal(__FUNCTION__,__FILE__,__LINE__)
 
 void cinfo_internal_unused(void* x, ...);
+
+void cempty_function(void);
+
+void cfunction_info_internal(const char* function_name,const char* file,int line); /* print info about calling function */
 
 void cinitfd(FILE* stdout_file,FILE* stderr_file); /* set the info(stdout) logfile and the error(stderr) logfile */
 

@@ -29,6 +29,16 @@ void cinfo_internal_unused(void* x, ...){
 	(void)x;
 	return;
 }
+void cempty_function(void){
+	return;
+}
+void cfunction_info_internal(const char* function_name,const char* file,int line){ /* print info about calling function */
+	if(cinfo_check_init == 0)cinitfd(stdout,stderr);
+
+	fprintf(cinfo_out,"[FUNCTION_INFO] %s() executed. (%s -- %i)\n",function_name,file,line);
+
+	return;	
+}
 void cinitfd(FILE* cinfo_out_file,FILE* cinfo_err_file){
 	cinfo_out = cinfo_out_file;
 	cinfo_err = cinfo_err_file;
@@ -73,7 +83,7 @@ void cdebug_internal(const char* file, int line,const char* calling_function,cha
 	time_t t;
 	time(&t);
 	struct tm * timeinfo = localtime(&t);
-	fprintf(cinfo_out,"[DEBUG](%d:%d:%d_%d-%d-%d)--(file: %s -- line :%i)->%s() ",timeinfo->tm_hour,timeinfo->tm_min,timeinfo->tm_sec,timeinfo->tm_mday,timeinfo->tm_mon+1,timeinfo->tm_year+1900,file,line,calling_function);
+	fprintf(cinfo_out,"[DEBUG](%d:%d:%d_%d-%d-%d)--(file: %s -- line: %i)->%s() ",timeinfo->tm_hour,timeinfo->tm_min,timeinfo->tm_sec,timeinfo->tm_mday,timeinfo->tm_mon+1,timeinfo->tm_year+1900,file,line,calling_function);
 	va_list args;
 	va_start(args,format);
 	vfprintf(cinfo_out,format,args);

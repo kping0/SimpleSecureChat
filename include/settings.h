@@ -38,13 +38,13 @@ typedef unsigned char byte;
 
 
 /* Print debug information */
-// #define DEBUG
+ #define DEBUG
 
 /* Spawn seperate update thread (to get messages from the server) */
 #define SSC_UPDATE_THREAD
 
 /* Interval for update thread in ms (if using an update thread) */
-#define SSC_UPDATE_INTERVAL 1000 
+#define SSC_UPDATE_INTERVAL 500
 
 /* Compile with GUI code (so you can choose between cli&gui) */
 #define SSC_GUI

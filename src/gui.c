@@ -96,17 +96,27 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 	byte* message = (byte*)gtk_entry_get_text(GTK_ENTRY(entry));
 	append_list_string_gui(messagelist,message);
 	append_list_string_gui(widgets->recvlist," ");
-	printf("Sending Message to %s\n",*(widgets->current_username));
+	cdebug("Sending Message to %s\n",*(widgets->current_username));
 	byte* encbuf = (byte*)encrypt_msg(username,(byte*)message,priv_evp,db); //"user" would be the receiving username
-	if(!encbuf)return;
-	printf("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+	if(!encbuf){
+		cerror("Could not encrypt message");
+		return;
+	}
+	cdebug("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+	BIO_write(srvconn,encbuf,strlen(encbuf));
+	char rsp[3];
+	BIO_read(srvconn,rsp,3);
+	if(strncmp(rsp,"ACK",3) != 0){
+		cerror("Server did not receive message");
+		free(encbuf);
+		return;
+	}
 	sqlite3_stmt* stmt;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,1,?1,?2);",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,get_user_uid(username,db));
 	sqlite3_bind_text(stmt,2,message,-1,0);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
-	BIO_write(srvconn,encbuf,strlen(encbuf));
 	free(encbuf);
 	gtk_entry_set_text(entry,"");
 	return;
@@ -175,10 +185,11 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
+
+	if(strcmp(recvbuf,"ERROR") != 0){
 #ifndef RELEASE_IMAGE
 	cdebug("received response from server -- %s",recvbuf);	
 #endif
-	if(strcmp(recvbuf,"ERROR") != 0){
 	sscsl* list = SSCS_list_open(recvbuf);
 	int i = 0;	
 	while(1){
@@ -205,9 +216,6 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	}
 	free(recvbuf);
 	int currentuserUID = get_user_uid(current_user,db);
-#ifdef DEBUG
-	fprintf(stdout,"DEBUG: Current user %s has id %i\n",current_user,currentuserUID);
-#endif
 	if(currentuserUID == -1)return 0;
 
 	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 AND uid2=1 OR uid=1 AND uid2=?2",-1,&stmt,NULL);

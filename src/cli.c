@@ -165,7 +165,7 @@ void ssc_cli_switch_current(WIN* p_win){
 }
 
 /*
- * 
+ *  return a ptr to the current screen content 
  */
 byte* ssc_cli_currently_selected(WIN* p_win){
 	WPAGE* current_page = p_win->current_page;
@@ -533,7 +533,9 @@ void ssc_cli_msg_upd(SSCGV* gv,byte* username){
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
-	
+#ifndef RELEASE_IMAGE
+	cdebug("received message %s",recvbuf);
+#endif
 	if(strcmp(recvbuf,"ERROR") != NULL){
 	sscsl* list = SSCS_list_open(recvbuf);
 	int i = 0;	
@@ -562,7 +564,7 @@ void ssc_cli_msg_upd(SSCGV* gv,byte* username){
 #endif /* !SSC_UPDATE_THREAD */
 	int currentuserUID = get_user_uid(current_user,db);
 	if(currentuserUID == -1)return;
-	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 OR uid2=?2",-1,&stmt,NULL);
+	sqlite3_prepare_v2(db,"select uid,message from messages where uid=1 AND uid2=?1 OR uid=?2 AND uid2=1",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,currentuserUID);
 	sqlite3_bind_int(stmt,2,currentuserUID);
 	while(sqlite3_step(stmt) == SQLITE_ROW){

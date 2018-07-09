@@ -26,32 +26,43 @@
 #include <../config.h>
 typedef unsigned char byte;
 
+
+
+
+
 /* DO NOT EDIT ABOVE THIS LINE */
 /* DO NOT EDIT ABOVE THIS LINE */
 /* DO NOT EDIT ABOVE THIS LINE */
 
 
 
-/* Uncomment below for debug information */
-/* #define DEBUG// */
 
-/*
- * By default SSC spawns a seperate thread to get new messages from the server, to disable this 
- * feature comment out the line below (SSC_UPDATE_THREAD)
- */
+/* Print debug information */
+// #define DEBUG
+
+/* Spawn seperate update thread (to get messages from the server) */
 #define SSC_UPDATE_THREAD
-#define SSC_UPDATE_INTERVAL 1000 /* if using update thread, time between updates in ms */
 
-/* Do you want to have the option to use the gui ? (comment out if you do NOT) */
+/* Interval for update thread in ms (if using an update thread) */
+#define SSC_UPDATE_INTERVAL 1000 
+
+/* Compile with GUI code (so you can choose between cli&gui) */
 #define SSC_GUI
 
+// #define RELEASE_IMAGE /* only in release builds */
+
+
+
 
 /* DO NOT EDIT BELOW THIS LINE */
 /* DO NOT EDIT BELOW THIS LINE */
 /* DO NOT EDIT BELOW THIS LINE */
+
+
+
+
 
 #define DEFAULT_HOST_NAME "52.14.103.245" /* default server ip */
-/* #define RELEASE_IMAGE// */
 
 /* some macros for compatibility */
 #define cmalloc(x) calloc(1,x)

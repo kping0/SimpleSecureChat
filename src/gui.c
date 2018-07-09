@@ -175,7 +175,9 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
-	
+#ifndef RELEASE_IMAGE
+	cdebug("received response from server -- %s",recvbuf);	
+#endif
 	if(strcmp(recvbuf,"ERROR") != 0){
 	sscsl* list = SSCS_list_open(recvbuf);
 	int i = 0;	
@@ -188,7 +190,7 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 			byte* sender = SSCS_object_string(obj2,"sender");
 			if(!sender)break;
 			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
-			if(decbuf)printf("Decrypted Message from %s: %s\n",sender,decbuf); 
+			if(decbuf)cdebug("Decrypted Message from %s: %s\n",sender,decbuf); 
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
 			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));
 			sqlite3_bind_text(stmt,2,decbuf,-1,0);
@@ -208,7 +210,7 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 #endif
 	if(currentuserUID == -1)return 0;
 
-	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 OR uid2=?2",-1,&stmt,NULL);
+	sqlite3_prepare_v2(db,"select uid,message from messages where uid=?1 AND uid2=1 OR uid=1 AND uid2=?2",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,currentuserUID);
 	sqlite3_bind_int(stmt,2,currentuserUID);
 	while(sqlite3_step(stmt) == SQLITE_ROW){

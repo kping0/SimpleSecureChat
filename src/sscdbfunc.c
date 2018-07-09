@@ -319,13 +319,16 @@ char* auth_usr(sqlite3* db){
 	return retptr;
 }
 
-/* Starts the one second update process */
+/*
+ * Starts the one second update process 
+ * Only used by the ncurses cli 
+ */ 
 void start_message_update(void* data){
-#ifdef SSC_UPDATE_THREAD /* failsafe check so we dont update twice */
+ #ifdef SSC_UPDATE_THREAD /* failsafe check so we dont update twice */
 	pthread_t tid;
 	int error = pthread_create(&tid,NULL,message_update_spawner,data);
 	assert(error == 0);
-#endif /* SSC_UPDATE_THREAD */
+ #endif /* SSC_UPDATE_THREAD */
 	return;
 }
 
@@ -357,7 +360,9 @@ void* update_messages_db(void* data){
 	free(getmsgbuf);
 	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
-	
+#ifndef RELEASE_IMAGE
+	cdebug("Got message %s from server",recvbuf);
+#endif
 	if(strcmp(recvbuf,"ERROR") != 0){
 	sscsl* list = SSCS_list_open(recvbuf);
 	int i = 0;	
@@ -366,6 +371,7 @@ void* update_messages_db(void* data){
 			sscsd* prebuf =	SSCS_list_data(list,i);	
 			if(!prebuf)break;
 			sscso* obj2 = SSCS_open(prebuf->data);
+			if(!obj2)break;
 			SSCS_data_release(&prebuf);
 			char* sender = SSCS_object_string(obj2,"sender");
 			if(!sender)break;
@@ -379,7 +385,7 @@ void* update_messages_db(void* data){
 			stmt = NULL;
 			SSCS_release(&obj2);
 			free(sender);
-			if(decbuf)free(decbuf);
+			free(decbuf);
 		}
 		SSCS_list_release(&list);
 	}

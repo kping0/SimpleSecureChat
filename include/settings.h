@@ -35,10 +35,11 @@ typedef unsigned char byte;
 /* DO NOT EDIT ABOVE THIS LINE */
 
 
+/* should only be defined in release ready code (&must be defined if compiling for a live enviroment) (cannot be defined with DEBUG) */
+// #define RELEASE_IMAGE 
 
-
-/* Print debug information */
- #define DEBUG
+/* Print debug information (cannot be defined on a release) */
+// #define DEBUG
 
 /* Spawn seperate update thread (to get messages from the server) */
 #define SSC_UPDATE_THREAD
@@ -49,7 +50,6 @@ typedef unsigned char byte;
 /* Compile with GUI code (so you can choose between cli&gui) */
 #define SSC_GUI
 
-// #define RELEASE_IMAGE /* only in release builds */
 
 
 
@@ -69,5 +69,10 @@ typedef unsigned char byte;
 #define cfree(x) free(x)
 #define mitbase64_decode(x,y,z) base64_decode(x,y,z)
 #define mitbase64_encode(x,y,z) base64_encode(x,y,z)
+
+#if defined(DEBUG) && defined(RELEASE_IMAGE) 
+	#error You cannot have debug enabled in a release build. 
+#endif /* DEBUG && RELEASE_IMAGE */
+
 
 #endif

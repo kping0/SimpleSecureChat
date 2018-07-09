@@ -99,15 +99,24 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	}
 	sscso* obj = SSCS_open((byte*)encrypted_buffer);
 	sscsd* enc_buf_data = SSCS_object_data(obj,"enc_buf");
-	if(!enc_buf_data)return NULL;
+	if(!enc_buf_data){
+		cdebug("no encrypted buffer found");
+		return NULL;
+	}
 	byte* enc_buf = enc_buf_data->data;
 	int enc_len = enc_buf_data->len;
 	sscsd* ek_data = SSCS_object_data(obj,"ek");
-	if(!ek_data)return NULL;
+	if(!ek_data){
+		cdebug("no encryption key data found");
+		return NULL;
+	}
 	byte* ek = ek_data->data;
 	int ekl = ek_data->len;	
 	sscsd* iv_data = SSCS_object_data(obj,"iv");
-	if(!iv_data)return NULL;
+	if(!iv_data){
+		cdebug("no iv data found");
+		return NULL;
+	}
 	byte* iv = iv_data->data;
 
 	byte* dec_buf = malloc(2000);
@@ -123,6 +132,10 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	sscso* obj3 = SSCS_open(serializedobj3);
 
 	byte* sender = (byte*)SSCS_object_string(obj,"sender");
+	if(!sender){
+		cdebug("could not find sender data");
+		return NULL;
+	}
 	EVP_PKEY *userpubk = get_pubk_username(sender,db);
 	if(!userpubk){
 		cerror("Could not retrieve public key for %s. Could not verify signature - Abort.",sender);

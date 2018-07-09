@@ -191,15 +191,24 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	cdebug("received response from server -- %s",recvbuf);	
 #endif
 	sscsl* list = SSCS_list_open(recvbuf);
+	if(list == NULL){
+		cerror("Could not open list");
+	}
 	int i = 0;	
 	while(1){
 			i++;	
 			sscsd* prebuf =	SSCS_list_data(list,i);	
-			if(!prebuf)break;
+			if(!prebuf){
+				cdebug("Could not retrieve item %d from list",i);	
+				break;
+			}
 			sscso* obj2 = SSCS_open(prebuf->data);
 			SSCS_data_release(&prebuf);
 			byte* sender = SSCS_object_string(obj2,"sender");
-			if(!sender)break;
+			if(!sender){
+				cerror("Could not retrieve sender from message.");
+				break;
+			}
 			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
 			if(decbuf)cdebug("Decrypted Message from %s: %s\n",sender,decbuf); 
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	

@@ -210,11 +210,12 @@ sscsd* SSCS_object_data(sscso* obj,byte* label){
 	byte* buf_ptr = obj->buf_ptr;
 	size_t allocated = obj->allocated;
 	size_t label_len = strlen((const char*)label);
-	byte* readpointer = memseq(buf_ptr,allocated,(byte*)label,label_len);
+	size_t modlabel_len = label_len+2;
+	byte modlabel[modlabel_len+1];
+	sprintf(modlabel,"%s:\"",label);	
+	byte* readpointer = memseq(buf_ptr,allocated,modlabel,modlabel_len);
 	if(!readpointer)return NULL;
-	readpointer+=label_len;
-	if(readpointer[0] != ':' || readpointer[1] != '"')return NULL;
-	readpointer+=2;
+	readpointer+=modlabel_len;
 	//Readpointer is now at the beginning of the base64 encoded data
 	int i = 0;
 	while(readpointer[i] != '"' && readpointer[i+1] != ';'){ //Run once to get length of string 

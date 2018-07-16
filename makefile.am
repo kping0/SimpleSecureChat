@@ -7,7 +7,7 @@ _no_warning_flags = -Wno-unused-function -Wno-pointer-sign -Wno-unused-result -W
 
 ssc_client_SOURCES = src/base64.c include/base64.h src/cstdinfo.c include/cstdinfo.h src/serialization.c include/serialization.h include/settings.h src/sscssl.c include/sscssl.h src/sscasymmetric.c include/sscasymmetric.h include/sscdbfunc.h src/sscdbfunc.c src/gui.c include/gui.h src/cli.c include/cli.h src/msgfunc.c include/msgfunc.h src/secure_chat_client.c src/loadconfig_client.c include/loadconfig_client.h src/simpleconfig.c include/simpleconfig.h
 
-ssc_client_CFLAGS = -std=gnu99 -D_GNU_SOURCE -D_POSIX_C_SOURCE=199309L -DSQLITE_THREADSAFE=1 $(_security_flags) $(_no_warning_flags) `pkg-config --cflags gtk+-3.0` `pkg-config --cflags glib-2.0`  -Iinclude 
+ssc_client_CFLAGS = -std=gnu99 -D_GNU_SOURCE -D_POSIX_C_SOURCE=199309L -DSQLITE_THREADSAFE=1 $(_security_flags) $(_no_warning_flags) `pkg-config --cflags gtk+-3.0` `pkg-config --cflags glib-2.0` -Iinclude 
 
 ssc_client_LDFLAGS = $(_security_linker) -lsqlite3 -lpthread -lcrypto -lssl `mysql_config --libs` `pkg-config --libs gtk+-3.0` `pkg-config --libs glib-2.0`
 

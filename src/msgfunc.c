@@ -44,7 +44,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 		return NULL;	
 	}
 	RAND_poll();
-	byte*enc_buf = malloc(2000);
+	byte * enc_buf = malloc(4096); /* we dont know how large the buffer is going to be but it should not be larger than 4096 Bytes */
 	//A Way to impliment the sign-then-encrypt with good context protection
 
 	sscso* sigmsg = SSCS_object();
@@ -119,8 +119,7 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
 	}
 	byte* iv = iv_data->data;
 
-	byte* dec_buf = malloc(2000);
-	memset(dec_buf,0,2000);
+	byte* dec_buf = calloc(1,4096);
 	
 	int dec_len = envelope_open(privKey,enc_buf,enc_len,ek,ekl,iv,dec_buf);
 	assert(dec_len > 0);

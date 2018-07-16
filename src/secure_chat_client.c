@@ -199,18 +199,29 @@ int main(void){
 		backend_vars->privkey = priv_evp;
 		backend_vars->db = db;
 		backend_vars->connection_variables = tls_vars;
-		GtkWidget *window;
-		gtk_init(NULL,NULL);
+		gtk_init(NULL,NULL); /* init gtk */
+
+		/* load css stylesheets */
+		GtkCssProvider* css_provider = gtk_css_provider_new();
+		if(!gtk_css_provider_load_from_path(css_provider,"gui_deps/usrcustom.css",NULL)){
+			g_object_unref(css_provider);
+			cexit("Could not load css stylesheet");
+		}
+		GdkScreen* screen = gdk_display_get_default_screen(gdk_display_get_default());
+		gtk_style_context_add_provider_for_screen(screen,GTK_STYLE_PROVIDER(css_provider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+	
+	
 		GtkBuilder* gtkBuilder = gtk_builder_new();		
 		gtkBuilder = gtk_builder_new();
-		gtk_builder_add_from_file(gtkBuilder,"gui.glade",NULL);
-		window = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"mainwindow"));
+		gtk_builder_add_from_file(gtkBuilder,"gui_deps/dynamic.glade",NULL);
+		GtkWidget *window = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"mainwindow"));
 		GtkWidget *contactslist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"contactslist"));
 		GtkWidget *messagelist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"messageslist"));
 		GtkWidget *sendmessagetext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"sendmessagetext"));
 		GtkWidget *addusertext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"addusertext"));
 		GtkWidget *chatpartnerlabel = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"currentchatpartner"));
 		GtkWidget *recvlist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"recvlist"));
+
 		struct sscswidgets_gui* widgetsobj = malloc(sizeof(struct sscswidgets_gui));
 		widgetsobj->window = window;
 		widgetsobj->contactslist = contactslist;

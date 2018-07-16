@@ -48,10 +48,26 @@ void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages Gtk
 	return;
 }
 
-void append_list_string_gui(GtkWidget* list,byte* item){ //Add Label to Container List
+static void internal_create_new_label(GtkWidget* list,byte* item){
 	GtkWidget* label = gtk_label_new(item);
 	gtk_container_add((GtkContainer*)list,label);
 	gtk_widget_show(label);
+	return;
+}
+void append_list_string_gui(GtkWidget* list,byte* item){ //Add Label to Container List
+	int maxperline = 32;
+	int rem_l = strlen(item);
+	char temp[maxperline+1];
+	temp[maxperline] = '\0';
+	int index = 0;
+	while(rem_l > maxperline){
+		memcpy(temp,(item+index),maxperline);
+		internal_create_new_label(list,temp);
+		rem_l -= maxperline;		
+		index += maxperline;
+	}
+	internal_create_new_label(list,(item+index));
+	internal_create_new_label(list," ");
 	return;
 }
 
@@ -124,18 +140,18 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 
 void add_user_entry_gui(GtkEntry* entry,gpointer data){
 	struct sscswidgets_gui* widgets = data;
-	GtkWidget* contactslist =  widgets->contactslist;
 	byte* username = (byte*)gtk_entry_get_text(GTK_ENTRY(entry));
 #ifdef DEBUG
 	fprintf(stdout,"trying to add user %s\n",username);
 #endif
 	addnewuser_gui(widgets,username);
-	add_contact_gui(contactslist,widgets,username);	
 	gtk_entry_set_text(entry,"");
 	return;
 }
 
 void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
+	GtkWidget* contactslist =  widgets_gui->contactslist;
+
 	sqlite3* db = ((widgets_gui->backend_vars)->db);
 	byte* gtrsa64 = (byte*)server_get_user_rsa(username);		
 	BIO_write(((widgets_gui->backend_vars)->connection_variables)->bio_obj,gtrsa64,strlen(gtrsa64));
@@ -145,14 +161,15 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
 #ifdef DEBUG
 	fprintf(stdout,"DEBUG: got usersaobj %s from srv\n",rxbuf);
 #endif
-	if(strcmp(rxbuf,"GETRSA_RSP_ERROR") == 0){
-		puts(rxbuf);
-	} 
-	else{
+	if(strcmp(rxbuf,"ERR") != 0){
 		sqlite3_stmt* stmt;
 		sscso* obj = SSCS_open(rxbuf);
 		byte* rsapub64 = SSCS_object_string(obj,"b64rsa");
-		if(!rsapub64){puts("No supplied public key");return;}
+		if(!rsapub64){
+			cerror("Encoded object did not contain a public key!");	
+			free(rxbuf);
+			return;
+		}
 		int rsalen = SSCS_object_int(obj,"rsalen");
 		sqlite3_prepare_v2(db,"insert into knownusers(uid,username,rsapub64,rsalen)values(NULL,?1,?2,?3);",-1,&stmt,NULL);
 		sqlite3_bind_text(stmt,1,username,-1,0);
@@ -162,8 +179,12 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
 		sqlite3_finalize(stmt);
 		free(rsapub64);
 		SSCS_release(&obj);
+		add_contact_gui(contactslist,widgets_gui,username);	
 	}
-		
+	else{
+		cinfo("Could not add user, server side error (maybe user doesnt exist?) ");
+	}
+	free(rxbuf);
 	return;
 }
 gboolean getmessages_gui(void* data){ //get message & add them to db

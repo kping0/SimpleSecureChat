@@ -1,0 +1,59 @@
+
+/*
+ *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
+ *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+* {
+ outline: 0px;
+ outline-style:none;
+}
+
+#contactslist * {
+ color: #ffffff;
+ background: #286DA8;
+ outline-style:none;
+ font-size: 100%;
+ padding: 4px;
+ border: none;
+ margin: 1px;
+ box-shadow: none;
+}
+
+#recvlist *,
+#messageslist * {
+ font-size: 100%;
+ color: #4d94ff; 
+ padding: 2px;
+}
+
+label#appname {
+ font-size: 40px; 
+ font-style: bold;
+ color: #1a75ff; 
+}
+
+.custom_label {
+ color: #80bfff;
+ font-size: 100%; 
+ font-style: bold;
+ padding: 4px;
+}
+
+@import url("theme_gtk/gtk.css");
+
+
+

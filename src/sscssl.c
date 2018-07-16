@@ -65,7 +65,7 @@ int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ /
 	
 	tls_vars->bio_obj = BIO_new_ssl_connect(tls_vars->ctx);
 	if(!(tls_vars->bio_obj != NULL)) return 0;
-	char conndetails[40];
+	char conndetails[22]; /* xxx.xxx.xxx.xxx:yyyyy */ 
 	sprintf(conndetails,"%s:%s",hostip,port);
 	chkv = BIO_set_conn_hostname(tls_vars->bio_obj, conndetails);
 	if(!(1 == chkv)) return 0;

@@ -134,27 +134,27 @@ void create_keypair(unsigned char* path4pubkey,unsigned char* path4privkey,int k
 
 int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of how messages could be encrypted
 	//encrypt test	
-	unsigned char* msg = malloc(100);
+	unsigned char* msg = calloc(1,100);
 	strncpy((char*)msg,"secret  test_message",100);
 
-	unsigned char* ek = malloc(EVP_PKEY_size(pubk_evp));
+	unsigned char* ek = calloc(1,EVP_PKEY_size(pubk_evp));
 	int ekl = EVP_PKEY_size(pubk_evp); 
 
-	unsigned char* iv = malloc(EVP_MAX_IV_LENGTH);
+	unsigned char* iv = calloc(1,EVP_MAX_IV_LENGTH);
 	RAND_poll(); //Seed CGRNG 
 	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
 		puts("Error getting CS-RNG for IV");	
 		return 0;	
 	}
 	RAND_poll(); //Change Seed for CGRNG
-	unsigned char* enc_buf = malloc(2000);
+	unsigned char* enc_buf = calloc(1,2000);
 	int enc_len = envelope_seal(&pubk_evp,msg,strlen((const char*)msg),&ek,&ekl,iv,enc_buf); //encrypt
 	if(enc_len <= 0){
 		puts("ERROR IN TESTFUNCTION");
 		return 0;	
 	}
 	//decrypt test
-	unsigned char* dec_buf = malloc(2000);
+	unsigned char* dec_buf = calloc(1,2000);
 	/*int dec_len =*/ envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
 	if(strncmp((const char*)msg,(const char*)dec_buf,strlen((const char*)msg)) == 0){
 		cdebug("Keypair Test Success");
@@ -163,5 +163,10 @@ int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of ho
 		cerror("Keypair Test Failed!");
 		return 0;
 	}
+	free(msg);
+	free(enc_buf);
+	free(dec_buf);
+	free(iv);
+	free(ek);
 	return 1;
 }

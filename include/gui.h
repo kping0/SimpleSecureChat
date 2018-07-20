@@ -44,6 +44,7 @@ struct sscswidgets_gui{
 	GtkWidget *contactslist; //handle to contactslist
 	GtkWidget *messagelist;	//Handle to messagelist (all send messages to partner)
 	GtkWidget *recvlist; //Handle to recvlist(all received messages from partner)
+	GtkWidget *messagescrollwindow;
 	GtkWidget *window; //Handle to Window
 	GtkLabel *chatpartnerlabel; //label that changes when you switch chat partner
 	byte** current_username; //Username of chat partner (not the local user)
@@ -61,7 +62,7 @@ void clear_messages_gui(struct sscswidgets_gui* data);
 
 void clear_recvlist_gui(struct sscswidgets_gui* data);
 
-void append_list_string_gui(GtkWidget* list,byte* item); //add label to widget list
+void append_list_string_gui(GtkWidget* list,GtkWidget* other_list,byte* item); //add label to widget list
 
 void change_current_user_gui(GtkWidget* widget,gpointer data); 
 
@@ -74,6 +75,10 @@ void add_user_entry_gui(GtkEntry* entry,gpointer data);
 void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username);
 
 gboolean getmessages_gui(void* data);
+
+void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets);
+
+void internal_scroll_window_msg_bottom_gui_2(GtkWidget* unused,void* data); /* wrapper around function above to fit the GTK function criteria */
 
 #endif /* SSCGUIHEADER */
 

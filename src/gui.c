@@ -54,7 +54,15 @@ static void internal_create_new_label(GtkWidget* list,byte* item){
 	gtk_widget_show(label);
 	return;
 }
-void append_list_string_gui(GtkWidget* list,byte* item){ //Add Label to Container List
+
+static void internal_create_blank_label(GtkWidget* list){
+	GtkWidget* label = gtk_label_new("");
+	gtk_container_add((GtkContainer*)list,label);
+	gtk_widget_show(label);
+	return;
+}
+
+void append_list_string_gui(GtkWidget* list,GtkWidget* other_list,byte* item){ //add string to container list and space to other_list
 	int maxperline = 32;
 	int rem_l = strlen(item);
 	char temp[maxperline+1];
@@ -63,11 +71,39 @@ void append_list_string_gui(GtkWidget* list,byte* item){ //Add Label to Containe
 	while(rem_l > maxperline){
 		memcpy(temp,(item+index),maxperline);
 		internal_create_new_label(list,temp);
+		internal_create_blank_label(other_list);
 		rem_l -= maxperline;		
 		index += maxperline;
 	}
 	internal_create_new_label(list,(item+index));
-	internal_create_new_label(list," ");
+	internal_create_blank_label(other_list);
+	internal_create_blank_label(list);	
+	internal_create_blank_label(other_list);
+	return;
+}
+void internal_scroll_window_msg_bottom_gui_2(GtkWidget* unused,void* data){ /* wrapper for internal_scroll_window_msg_bottom_gui() so that it can be used as a Gtk Callback function */
+	(void)unused;
+	internal_scroll_window_msg_bottom_gui((struct sscswidgets_gui*)data);
+	return;
+}
+void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets){
+
+	GtkScrolledWindow* scrwin = (GtkScrolledWindow*)widgets->messagescrollwindow;
+
+	gdouble upper = 0;
+	gdouble pgsz = 0;
+	gdouble lower = 0;
+	gdouble adjVal = 0;
+	gdouble val = 0;
+
+	GtkAdjustment * vAdj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrwin));
+
+	upper = gtk_adjustment_get_upper(vAdj);
+	pgsz = gtk_adjustment_get_page_size(vAdj);
+
+	adjVal = upper - pgsz;
+	gtk_adjustment_set_value(vAdj,adjVal); 
+	gtk_scrolled_window_set_vadjustment(GTK_SCROLLED_WINDOW(scrwin),vAdj);
 	return;
 }
 
@@ -103,22 +139,27 @@ void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,byt
 }
 
 void send_message_entry_gui(GtkEntry* entry,gpointer data){
+
 	struct sscswidgets_gui* widgets = data;
+
 	sqlite3* db = (widgets->backend_vars)->db;
 	BIO* srvconn = ((widgets->backend_vars)->connection_variables)->bio_obj;		
 	EVP_PKEY* priv_evp = (widgets->backend_vars)->privkey;
 	byte* username = *(widgets->current_username);
-	GtkWidget* messagelist = widgets->messagelist;	
 	byte* message = (byte*)gtk_entry_get_text(GTK_ENTRY(entry));
-	append_list_string_gui(messagelist,message);
-	append_list_string_gui(widgets->recvlist," ");
+	GtkWidget* messagelist = widgets->messagelist;	
+	GtkWidget* mainwin = widgets->window;
+
+	append_list_string_gui(messagelist,widgets->recvlist,message);
 	cdebug("Sending Message to %s\n",*(widgets->current_username));
+
 	byte* encbuf = (byte*)encrypt_msg(username,(byte*)message,priv_evp,db); //"user" would be the receiving username
 	if(!encbuf){
 		cerror("Could not encrypt message");
 		return;
 	}
 	cdebug("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
+
 	BIO_write(srvconn,encbuf,strlen(encbuf));
 	char rsp[3];
 	BIO_read(srvconn,rsp,3);
@@ -127,6 +168,7 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 		free(encbuf);
 		return;
 	}
+
 	sqlite3_stmt* stmt;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,1,?1,?2);",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,get_user_uid(username,db));
@@ -134,7 +176,10 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 	free(encbuf);
+
 	gtk_entry_set_text(entry,"");
+	internal_scroll_window_msg_bottom_gui(widgets);
+	gtk_widget_show_all(mainwin);
 	return;
 }
 
@@ -254,12 +299,10 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	while(sqlite3_step(stmt) == SQLITE_ROW){
 		int sqluid = sqlite3_column_int(stmt,0);
 		if(sqluid == 1){
-			append_list_string_gui(messagelist,(byte*)sqlite3_column_text(stmt,1));
-			append_list_string_gui(recvlist," ");
+			append_list_string_gui(messagelist,recvlist,(byte*)sqlite3_column_text(stmt,1));
 		}	
 		else if(sqluid == currentuserUID){
-			append_list_string_gui(recvlist,(byte*)sqlite3_column_text(stmt,1));
-			append_list_string_gui(((sscvars_gui*)data)->messagelist," ");
+			append_list_string_gui(recvlist,messagelist,(byte*)sqlite3_column_text(stmt,1));
 		}
 	}
 	sqlite3_finalize(stmt);

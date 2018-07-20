@@ -60,6 +60,7 @@
 gboolean timedupdate_gui(void* data){
 	clear_messages_gui(data);	
 	getmessages_gui(data);
+//	internal_scroll_window_msg_bottom_gui(data);
 	return 1;
 }
 
@@ -203,7 +204,7 @@ int main(void){
 
 		/* load css stylesheets */
 		GtkCssProvider* css_provider = gtk_css_provider_new();
-		if(!gtk_css_provider_load_from_path(css_provider,"gui_deps/usrcustom.css",NULL)){
+		if(!gtk_css_provider_load_from_path(css_provider,"gui_deps/usrcustom.cssfile",NULL)){
 			g_object_unref(css_provider);
 			cexit("Could not load css stylesheet");
 		}
@@ -221,6 +222,8 @@ int main(void){
 		GtkWidget *addusertext = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"addusertext"));
 		GtkWidget *chatpartnerlabel = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"currentchatpartner"));
 		GtkWidget *recvlist = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"recvlist"));
+		
+		GtkWidget *messagescrollwindow = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"messages_scrolled_window"));
 
 		struct sscswidgets_gui* widgetsobj = malloc(sizeof(struct sscswidgets_gui));
 		widgetsobj->window = window;
@@ -228,18 +231,26 @@ int main(void){
 		widgetsobj->messagelist = messagelist;
 		widgetsobj->chatpartnerlabel = (GtkLabel*)chatpartnerlabel;
 		widgetsobj->recvlist = recvlist;
+		widgetsobj->messagescrollwindow = messagescrollwindow;
 		widgetsobj->backend_vars = backend_vars;
 		byte* username = NULL;
 		widgetsobj->current_username = &username;
-		g_object_unref(G_OBJECT(gtkBuilder));
+
 		/* Connect signals to the handlers for sending messages & adding users */
 		g_signal_connect(G_OBJECT(window),"destroy",G_CALLBACK(gtk_main_quit),NULL);
 		g_signal_connect(G_OBJECT(sendmessagetext),"activate",G_CALLBACK(send_message_entry_gui),widgetsobj);
 		g_signal_connect(G_OBJECT(addusertext),"activate",G_CALLBACK(add_user_entry_gui),widgetsobj);
-		init_gui(widgetsobj); //Add known users to sidebar (this is NOT gtk_init)
+/* TESTING */
+		GtkWidget* test_func = GTK_WIDGET(gtk_builder_get_object(gtkBuilder,"test_func"));
+		g_signal_connect(G_OBJECT(test_func),"clicked",G_CALLBACK(internal_scroll_window_msg_bottom_gui_2),widgetsobj);
+/* TESTING */
+		g_object_unref(G_OBJECT(gtkBuilder));
+		init_gui(widgetsobj); /* do ssc neccessary (such as adding the contacts on the sidebar) */
 		gtk_widget_show_all(window);
+
 		g_timeout_add(1000,&timedupdate_gui,widgetsobj); //this updates the gui and retrieves messages from the server every 1000ms
 		/* Start Main Loop */
+
 		gtk_main();
 		goto CLEANUP;
 	}

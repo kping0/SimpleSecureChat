@@ -382,3 +382,21 @@ int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_P
 
 }
 
+void filter_string(byte* string){
+#ifndef RAW_MESSAGE_OUTPUT
+	int i = 0;
+	int string_l = strlen(string);
+
+	while(i != string_l){
+		if(((string[i] >= 32) && (string[i] <= 122))){ 
+			/* letter is allowed */
+		}
+		else{
+			/* replace letter with placeholder */
+			string[i] = UNALLOWED_CHAR_PLACEHOLDER;
+		}
+		i++;
+	}
+#endif /* RAW_MESSAGE_OUTPUT */
+	return;
+}

@@ -547,7 +547,9 @@ void ssc_cli_msg_upd(SSCGV* gv,byte* username){
 			SSCS_data_release(&prebuf);
 			byte* sender = SSCS_object_string(obj2,"sender");
 			if(!sender)break;
-			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
+			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);		
+			if(!decbuf)break;
+			filter_string(decbuf);
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
 			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));
 			sqlite3_bind_text(stmt,2,decbuf,-1,0);

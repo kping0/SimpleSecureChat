@@ -59,5 +59,7 @@ int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_P
 byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db); //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
 
 byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db); // Attempts to decrypt buffer with your private key
+
+void filter_string(byte* string);
 	
 #endif /* SSC_MSGFUNC_H */

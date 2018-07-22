@@ -275,7 +275,9 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 				cerror("Could not retrieve sender from message.");
 				break;
 			}
-			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	if(!decbuf)break;
+			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	
+			if(!decbuf)break;
+			filter_string(decbuf); /* filter down to small subset of ASCII */
 			if(decbuf)cdebug("Decrypted Message from %s: %s\n",sender,decbuf); 
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
 			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));

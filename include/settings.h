@@ -36,20 +36,24 @@ typedef unsigned char byte;
 
 
 /* should only be defined in release ready code (&must be defined if compiling for a live enviroment) (cannot be defined with DEBUG) */
-// #define RELEASE_IMAGE 
+	// #define RELEASE_IMAGE 
 
 /* Print debug information (cannot be defined on a release) */
-// #define DEBUG 
+	// #define DEBUG 
 
 /* Spawn seperate update thread (to get messages from the server) */
-#define SSC_UPDATE_THREAD
+	#define SSC_UPDATE_THREAD
 
 /* Interval for update thread in ms (if using an update thread) */
-#define SSC_UPDATE_INTERVAL 500
+	#define SSC_UPDATE_INTERVAL 500
 
 /* Compile with GUI code (so you can choose between cli&gui) */
-#define SSC_GUI
+	#define SSC_GUI
 
+/* placeholder for unallowed characters */
+	#define UNALLOWED_CHAR_PLACEHOLDER '~'
+/* if you want raw unfiltered message output, otherwise only subset of ASCII */
+	// #define RAW_MESSAGE_OUTPUT
 
 
 

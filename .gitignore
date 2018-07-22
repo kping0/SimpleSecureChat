@@ -2,6 +2,7 @@
 *.Po
 *.log
 *.o
+*.swp
 aclocal.m4
 config.h
 config.status

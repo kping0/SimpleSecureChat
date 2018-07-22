@@ -39,7 +39,7 @@ typedef unsigned char byte;
 // #define RELEASE_IMAGE 
 
 /* Print debug information (cannot be defined on a release) */
-/* #define DEBUG */
+// #define DEBUG 
 
 /* Spawn seperate update thread (to get messages from the server) */
 #define SSC_UPDATE_THREAD

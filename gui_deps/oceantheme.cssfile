@@ -1,3 +1,4 @@
+
 /*
  *  <SimpleSecureChat Client/Server - E2E encrypted messaging application written in C>
  *  Copyright (C) 2017-2018 The SimpleSecureChat Authors. <kping0> 
@@ -16,13 +17,43 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+* {
+ outline: 0px;
+ outline-style:none;
+}
+
+#contactslist * {
+ color: #ffffff;
+ background: #286DA8;
+ outline-style:none;
+ font-size: 100%;
+ padding: 4px;
+ border: none;
+ margin: 1px;
+ box-shadow: none;
+}
+
+#recvlist *,
+#messageslist * {
+ font-size: 100%;
+ color: #4d94ff; 
+ padding: 2px;
+}
+
+label#appname {
+ font-size: 40px; 
+ font-style: bold;
+ color: #1a75ff; 
+}
+
+.custom_label {
+ color: #80bfff;
+ font-size: 100%; 
+ font-style: bold;
+ padding: 4px;
+}
+
+@import url("theme_gtk/gtk.cssfile");
 
 
 
-/* PUT ALL OFF YOUR CUSTOM GTK+ CSS SETTINGS IN THIS FILE */
-
-/* ----- Uncomment for jewel theme ----- */
- @import url("jeweltheme.css"); 
-
-/* ----- Uncomment for ocean theme ----- */
-/* @import url("oceantheme.css"); */

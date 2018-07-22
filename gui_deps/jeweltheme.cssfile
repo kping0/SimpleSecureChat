@@ -24,7 +24,7 @@
 
 #contactslist * {
  color: #ffffff;
- background: #286DA8;
+ background: #E52A6F;
  outline-style:none;
  font-size: 100%;
  padding: 4px;
@@ -36,24 +36,22 @@
 #recvlist *,
 #messageslist * {
  font-size: 100%;
- color: #4d94ff; 
+ color: #FF33CC;
  padding: 2px;
 }
 
 label#appname {
  font-size: 40px; 
- font-style: bold;
- color: #1a75ff; 
+ color: #ff66ff; 
 }
 
 .custom_label {
- color: #80bfff;
+ color: #FF33CC;
  font-size: 100%; 
- font-style: bold;
  padding: 4px;
 }
 
-@import url("theme_gtk/gtk.css");
+@import url("theme_gtk/gtk.cssfile");
 
 
 

@@ -86,8 +86,9 @@ void internal_scroll_window_msg_bottom_gui_2(GtkWidget* unused,void* data){ /* w
 	internal_scroll_window_msg_bottom_gui((struct sscswidgets_gui*)data);
 	return;
 }
-void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets){
-
+void* internal_scroll_window_msg_bottom_gui(void* data){
+	/* sleeping here fixes the issue (if called from seperate thread) */
+	struct sscswidgets_gui* widgets = data;
 	GtkScrolledWindow* scrwin = (GtkScrolledWindow*)widgets->messagescrollwindow;
 
 	gdouble upper = 0;
@@ -104,7 +105,7 @@ void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets){
 	adjVal = upper - pgsz;
 	gtk_adjustment_set_value(vAdj,adjVal); 
 	gtk_scrolled_window_set_vadjustment(GTK_SCROLLED_WINDOW(scrwin),vAdj);
-	return;
+	return NULL;
 }
 
 void change_current_user_gui(GtkWidget* widget,gpointer data){
@@ -179,6 +180,9 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 
 	gtk_entry_set_text(entry,"");
 	internal_scroll_window_msg_bottom_gui(widgets);
+#ifdef TESTING
+	start_clear_thread(widgets);
+#endif
 	gtk_widget_show_all(mainwin);
 	return;
 }

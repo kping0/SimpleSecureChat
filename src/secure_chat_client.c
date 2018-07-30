@@ -64,6 +64,15 @@ gboolean timedupdate_gui(void* data){
 	return 1;
 }
 
+#ifdef TESTING
+void start_clear_thread(void* data){
+	pthread_t info;
+	int err = pthread_create(&info,NULL,internal_scroll_window_msg_bottom_gui,data);
+	assert(err == 0);
+	return;
+}
+#endif /* TESTING */
+
 #endif /* SSC_GUI */
 
 int pexit(byte* error){

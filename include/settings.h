@@ -78,5 +78,4 @@ typedef unsigned char byte;
 	#error You cannot have debug enabled in a release build. 
 #endif /* DEBUG && RELEASE_IMAGE */
 
-
 #endif

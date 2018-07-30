@@ -54,6 +54,8 @@
 #define AUTHUSR_RSP 10
 
 
+int nsleep(long milliseconds);
+
 sqlite3* init_db(char* dbfname);
 
 void add_known_user(char* username,RSA *userpubkey,sqlite3 *db,char* authkey);

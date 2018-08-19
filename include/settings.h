@@ -42,20 +42,22 @@ typedef unsigned char byte;
 	// #define DEBUG 
 
 /* Spawn seperate update thread (to get messages from the server) */
-	#define SSC_UPDATE_THREAD
+	 #define SSC_UPDATE_THREAD
 
 /* Interval for update thread in ms (if using an update thread) */
-	#define SSC_UPDATE_INTERVAL 500
+	 #define SSC_UPDATE_INTERVAL 500
 
 /* Compile with GUI code (so you can choose between cli&gui) */
-	#define SSC_GUI
+	 #define SSC_GUI
 
 /* placeholder for unallowed characters */
 	#define UNALLOWED_CHAR_PLACEHOLDER '~'
+
 /* if you want raw unfiltered message output, otherwise only subset of ASCII */
 	// #define RAW_MESSAGE_OUTPUT
 
-
+/* do you want one line of log for every function executed ? (DEBUG) */
+	// #define SSC_FUNCTION_LOG
 
 
 /* DO NOT EDIT BELOW THIS LINE */
@@ -77,5 +79,13 @@ typedef unsigned char byte;
 #if defined(DEBUG) && defined(RELEASE_IMAGE) 
 	#error You cannot have debug enabled in a release build. 
 #endif /* DEBUG && RELEASE_IMAGE */
+
+#if defined(DEBUG) && defined(SSC_FUNCTION_LOG)
+	#define debuginfo() cfunction_info()
+	#define debugprint() cfunction_info()
+#else
+	#define debuginfo() cempty_function()
+	#define debugprint() cempty_function()
+#endif /* DEBUG && SSC_FUNCTION_LOG */
 
 #endif

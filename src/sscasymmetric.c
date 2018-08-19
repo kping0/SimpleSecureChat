@@ -28,6 +28,7 @@ typedef unsigned char byte;
 int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_len,
 	unsigned char *encrypted_key, int encrypted_key_len, unsigned char *iv,
 	unsigned char *plaintext){
+	debugprint();
 	EVP_CIPHER_CTX *ctx;
 	int len;
 	int plaintext_len;
@@ -52,6 +53,7 @@ int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_
 int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
 	unsigned char **encrypted_key, int *encrypted_key_len, unsigned char *iv,
 	unsigned char *ciphertext){
+	debugprint();
 	EVP_CIPHER_CTX *ctx;
 	int ciphertext_len;
 	int len;
@@ -72,12 +74,13 @@ int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_le
  */
 
 int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,unsigned char* path4pubkey,unsigned char* path4privkey){
+	debugprint();
 	/*
 	* This Function reads the Public&Private key from files into (initialized)EVP_PKEY objects...
 	*/
 	BIO* rsa_pub_bio = BIO_new_file(path4pubkey,"r");
 	if(rsa_pub_bio == NULL){
-		puts("error loading public key!"); //error checking
+		cerror("could not load public key!");
 		return 0;	
 	}
 	RSA* rsa_pub = RSA_new();
@@ -88,7 +91,7 @@ int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,unsigned char* path4pubkey,
 	
 	BIO* rsa_priv_bio = BIO_new_file(path4privkey,"r");
 	if(rsa_priv_bio == NULL){
-		puts("error loading private key!"); //error checking
+		cerror("could not load private key!");
 		return 0;	
 	}
 	RSA* rsa_priv = RSA_new();
@@ -96,7 +99,7 @@ int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,unsigned char* path4pubkey,
 	BIO_free(rsa_priv_bio);
 	RSA_blinding_on(rsa_priv,NULL);
 	if(RSA_check_key(rsa_priv) <= 0){
-		puts("Invalid Private Key");
+		cerror("Invalid Private Key");
 		return 0;	
 	}
 	EVP_PKEY_assign_RSA(privKey,rsa_priv); 
@@ -105,13 +108,14 @@ int load_keypair(EVP_PKEY* pubKey, EVP_PKEY* privKey,unsigned char* path4pubkey,
 }
 
 void create_keypair(unsigned char* path4pubkey,unsigned char* path4privkey,int keysize){
+	debugprint();
     RSA* rsa = RSA_new();
     BIGNUM* prime = BN_new();
     BN_set_word(prime,RSA_F4);
     RSA_generate_key_ex(rsa,keysize,prime,NULL);
     int check_key = RSA_check_key(rsa);
     while (check_key <= 0) {
-        puts( "error...regenerating...");
+	cerror("failed to generate RSA key, regenerating...");
 	RSA_generate_key_ex(rsa,8192,prime,NULL);
         check_key = RSA_check_key(rsa);
     }
@@ -133,6 +137,7 @@ void create_keypair(unsigned char* path4pubkey,unsigned char* path4privkey,int k
 
 
 int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of how messages could be encrypted
+	debugprint();
 	//encrypt test	
 	unsigned char* msg = calloc(1,100);
 	strncpy((char*)msg,"secret  test_message",100);
@@ -143,19 +148,19 @@ int test_keypair(EVP_PKEY* pubk_evp,EVP_PKEY* priv_evp){ //Also an example of ho
 	unsigned char* iv = calloc(1,EVP_MAX_IV_LENGTH);
 	RAND_poll(); //Seed CGRNG 
 	if(RAND_bytes(iv,EVP_MAX_IV_LENGTH) != 1){
-		puts("Error getting CS-RNG for IV");	
+		cerror("Error generating IV from CSPRNG");
 		return 0;	
 	}
 	RAND_poll(); //Change Seed for CGRNG
 	unsigned char* enc_buf = calloc(1,2000);
 	int enc_len = envelope_seal(&pubk_evp,msg,strlen((const char*)msg),&ek,&ekl,iv,enc_buf); //encrypt
 	if(enc_len <= 0){
-		puts("ERROR IN TESTFUNCTION");
+		cerror("could not encrypt test message");
 		return 0;	
 	}
-	//decrypt test
 	unsigned char* dec_buf = calloc(1,2000);
-	/*int dec_len =*/ envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
+	envelope_open(priv_evp,enc_buf,enc_len,ek,ekl,iv,dec_buf); //decrypt
+
 	if(strncmp((const char*)msg,(const char*)dec_buf,strlen((const char*)msg)) == 0){
 		cdebug("Keypair Test Success");
 	}

@@ -37,6 +37,8 @@
 #include <sqlite3.h> 
 
 #include "settings.h"
+#include "cstdinfo.h"
+#include "simpleconfig.h"
 #include "msgfunc.h"
 #include "base64.h"
 
@@ -53,8 +55,6 @@
 #define GETRSA_RSP 8
 #define AUTHUSR_RSP 10
 
-
-int nsleep(long milliseconds);
 
 sqlite3* init_db(char* dbfname);
 

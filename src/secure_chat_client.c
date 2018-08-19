@@ -58,30 +58,24 @@
 #include "gui.h"
 
 gboolean timedupdate_gui(void* data){
+	debugprint();
 	clear_messages_gui(data);	
 	getmessages_gui(data);
 //	internal_scroll_window_msg_bottom_gui(data);
 	return 1;
 }
 
-#ifdef TESTING
-void start_clear_thread(void* data){
-	pthread_t info;
-	int err = pthread_create(&info,NULL,internal_scroll_window_msg_bottom_gui,data);
-	assert(err == 0);
-	return;
-}
-#endif /* TESTING */
-
 #endif /* SSC_GUI */
 
 int pexit(byte* error){
+	debugprint();
 	cerror("Exiting: %s",error);
 	exit(EXIT_FAILURE);
 }
 
 /* Start of application */
 int main(void){
+	debugprint();
 	fprintf(stdout,"Welcome to %s. Report bugs to %s.\n",PACKAGE_STRING,PACKAGE_BUGREPORT);
 
 	SCONFIG* config = loadconfig_client(); /* get config info */
@@ -269,6 +263,14 @@ int main(void){
 	 * NCurses CLI Interface 
 	 */
 	ssc_cli_init(); //Start interface
+
+	/* log to file so that it doesnt mess with ncurses ui */
+	byte* log_file = sconfig_get_str(config,"LOG_FILE");
+	FILE* log_fd = fopen(log_file,"a+");	
+	cinitfd(log_fd,log_fd);
+	free(log_file);
+
+	/* init color pairs to use */
 	init_pair(1,COLOR_CYAN,COLOR_BLACK);
 	init_pair(2,COLOR_GREEN,COLOR_BLACK);
 	int row,col;
@@ -372,14 +374,14 @@ int main(void){
 				break;
 			case ':': //command mode 
 				cbreak(); //switch out of halfdelay
-				usrcmd = _getstr(); //get userinput
+				usrcmd = _getstr_custom("<cmd_mode>: "); //get userinput
 				ssc_cli_cmd_parser(gv,usrcmd); //parse commands
 				free(usrcmd); //free userinput
 				halfdelay(5); //switch back into halfdelay
 				break;
 			case KEY_DOWN:
 			case 'j': //go down
-				//Calculate the next curor position (y = y+2)
+				//Calculate the next cursor position (y = y+2)
 				getyx(stdscr,y,x);
 				y += 2;
 				if(current_panel == 1){

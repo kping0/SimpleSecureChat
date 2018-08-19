@@ -36,6 +36,7 @@
 #include <openssl/pem.h>
 
 #include "settings.h"
+#include "cstdinfo.h"
 
 #ifndef sscsslstruct
 #define sscsslstruct

@@ -1,6 +1,7 @@
 bin_PROGRAMS = ssc_client ssc_client_config
 
 _security_flags = -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 -g -O2 -pipe -fexceptions -fstack-protector-all -fstack-check -Wall -Wextra -Wformat -Wformat-security 
+
 _security_linker = -pie -fPIE -Wl,-z,relro,-z,now,-z,defs 
 
 _no_warning_flags = -Wno-unused-function -Wno-pointer-sign -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable

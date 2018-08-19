@@ -92,7 +92,7 @@ int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ /
 		X509_free(cert_test);
 		}
 	if(NULL == cert_test){
-		puts("ERR_NO_CERT");
+		cerror("no certificate provided by the server (ERR_NO_CERT)");
 		return 0;
 	}
 

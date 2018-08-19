@@ -76,7 +76,7 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username);
 
 gboolean getmessages_gui(void* data);
 
-void* internal_scroll_window_msg_bottom_gui(void* data);
+void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets);
 
 void internal_scroll_window_msg_bottom_gui_2(GtkWidget* unused,void* data); /* wrapper around function above to fit the GTK function criteria */
 

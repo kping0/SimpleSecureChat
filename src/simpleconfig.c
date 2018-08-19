@@ -20,6 +20,7 @@
 #include "simpleconfig.h"
 
 static int nsleep(long miliseconds){ //Thread Safe Sleep
+	debugprint();
    struct timespec req, rem;
    if(miliseconds > 999){   
         req.tv_sec = (int)(miliseconds / 1000);                           
@@ -35,7 +36,7 @@ static int nsleep(long miliseconds){ //Thread Safe Sleep
 
 
 SCONFIG* sconfig_new_internal(const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	SCONFIG* new_config = cmalloc(sizeof(SCONFIG));
 	if(new_config == NULL){
 		cexit("sconfig_new() could not allocate memory (file: %s - line: %d)",file,line);
@@ -47,7 +48,7 @@ SCONFIG* sconfig_new_internal(const char* file,int line){
 	return new_config;
 }
 void sconfig_close_internal(SCONFIG** sconfig_object){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(sconfig_object == NULL)return;
 	SCONFIG* obj = *sconfig_object;
 	if(obj == NULL)return;
@@ -58,7 +59,7 @@ void sconfig_close_internal(SCONFIG** sconfig_object){
 	return;
 }
 int sconfig_check_internal(SCONFIG* obj,const char* file, int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(obj == NULL){
 		cdebug("sconfig_check() passed SCONFIG object is NULL (file: %s - line: %d)",file,line);
 		return -1;
@@ -76,7 +77,7 @@ int sconfig_check_internal(SCONFIG* obj,const char* file, int line){
 }
 
 int sconfig_config_exists(byte* path_to_config){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(path_to_config == NULL)return -1;
 	FILE* testfd = fopen(path_to_config,"rb");		
 	if(testfd == NULL)return 0;
@@ -85,7 +86,7 @@ int sconfig_config_exists(byte* path_to_config){
 }
 
 SCONFIG* sconfig_load_internal(byte* path_to_config,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(path_to_config == NULL)return NULL;
 	SCONFIG* obj = sconfig_new_internal(file,line);
 
@@ -128,7 +129,7 @@ SCONFIG* sconfig_load_internal(byte* path_to_config,const char* file,int line){
 }
 
 void* sconfig_get_internal(SCONFIG* obj,byte* object_name,const char* file, int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(sconfig_check_internal(obj,file,line) != 0)return NULL;
 	sscsd* data = SSCS_object_data(obj->configtemp,object_name);				
 	if(data == NULL)return NULL;
@@ -137,7 +138,7 @@ void* sconfig_get_internal(SCONFIG* obj,byte* object_name,const char* file, int 
 	return retptr; /* user is responsible for cfree() */
 }
 sscsd* sconfig_get_full_internal(SCONFIG* obj,byte* object_name,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(sconfig_check_internal(obj,file,line) != 0)return NULL;
 	sscsd* data = SSCS_object_data(obj->configtemp,object_name);				
 	if(data == NULL)return NULL;
@@ -147,7 +148,7 @@ byte* sconfig_get_str_internal(SCONFIG* obj,byte* label,const char* file,int lin
 	return sconfig_get_internal(obj,label,file,line);	
 }
 int sconfig_get_int_internal(SCONFIG* obj,char* label,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	sscsd* data = sconfig_get_full_internal(obj,label,file,line);
 	if(data == NULL){
 		cerror("sconfig_get_int() could not retrieve data for label '%s'",label);
@@ -164,7 +165,7 @@ int sconfig_get_int_internal(SCONFIG* obj,char* label,const char* file,int line)
 	return retval;	
 }
 int sconfig_set_internal(SCONFIG* obj,char* label,byte* data,size_t len,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	while(obj->lock == 1){
 		nsleep(50);
 	}
@@ -175,17 +176,17 @@ int sconfig_set_internal(SCONFIG* obj,char* label,byte* data,size_t len,const ch
 	return rv;
 }
 int sconfig_set_str_internal(SCONFIG* obj,char* label,byte* string_to_set,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	size_t len = strlen(string_to_set);
 	return sconfig_set_internal(obj,label,string_to_set,len,file,line);		
 }
 int sconfig_set_int_internal(SCONFIG* obj,char* label,int integer_to_store,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	size_t len = sizeof(int);
 	return sconfig_set_internal(obj,label,(byte*)&integer_to_store,len,file,line);
 }
 int sconfig_unset_internal(SCONFIG* obj,char* label,const char* file,int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	while(obj->lock == 1){
 		nsleep(50);
 	}	
@@ -196,7 +197,7 @@ int sconfig_unset_internal(SCONFIG* obj,char* label,const char* file,int line){
 	return rv;		
 }
 int sconfig_write_internal(SCONFIG* obj,const char* file, int line){
-	cdebug("%s called",__FUNCTION__);
+	debugprint();
 	if(sconfig_check_internal(obj,file,line) != 0)return -1;
 	while(obj->lock == 1){
 		nsleep(50);

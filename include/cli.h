@@ -104,6 +104,8 @@ int ssc_cli_msg_cursor_move(SSCGV* gv,int c_y,int c_x);
 
 byte* _getstr(void);
 
+byte* _getstr_custom(byte* input_prefix);
+
 void ssc_cli_add_message(WIN* window4msg,WIN* window4space,byte* message);
 
 void ssc_cli_cmd_parser(SSCGV* gv,byte* userinput);

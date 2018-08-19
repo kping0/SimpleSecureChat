@@ -11,6 +11,7 @@
  * SimpleSecureChat Serialization Library. Made with Security in mind.
 */
 byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){ 
+	debugprint();
 	size_t i = 0;size_t x = 0;byte* firstbyte = NULL; //Initialize variables
 	while(1){
 		if(!(i < buf_size))return NULL;
@@ -29,12 +30,14 @@ byte* memseq(byte* buf,size_t buf_size,byte* byteseq,size_t byteseq_len){
 	return NULL;
 }
 sscso *SSCS_object(void){
+	debugprint();
 	sscso* obj = cmalloc(sizeof(struct SSCS_struct));		
 	obj->buf_ptr = NULL; 
 	obj->allocated = 0;
 	return obj;
 }
 sscsl *SSCS_list(void){
+	debugprint();
 	sscsl* list = cmalloc(sizeof(struct SSCS_list));
 	list->buf_ptr = NULL;
 	list->allocated = 0;
@@ -43,6 +46,7 @@ sscsl *SSCS_list(void){
 	return list;
 }
 sscsl *SSCS_list_open(byte* buf){
+	debugprint();
 	size_t len = strlen((const char*)buf);
 	void* buf_ptr = cmalloc(len);
 	memcpy(buf_ptr,buf,len);
@@ -53,6 +57,7 @@ sscsl *SSCS_list_open(byte* buf){
 }
 
 sscso *SSCS_open(byte* buf){
+	debugprint();
 	size_t len = strlen((const char*)buf);
 	void* buf_ptr = cmalloc(len);
 	memcpy(buf_ptr,buf,len);
@@ -62,6 +67,7 @@ sscso *SSCS_open(byte* buf){
 	return obj;
 }
 int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
+	debugprint();
 	if(size <= 0)return -1; //Size has to be bigger than 0
 	void *old_buf_ptr = list->buf_ptr;
 	size_t old_buf_size = list->allocated;	
@@ -110,6 +116,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	return 0;
 }
 int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
+	debugprint();
 	if(size <= 0)return -1; //Size has to be bigger than 0
 	void *old_buf_ptr = obj->buf_ptr;
 	size_t old_buf_size = obj->allocated;	
@@ -167,6 +174,7 @@ int SSCS_object_add_data(sscso* obj,byte* label,byte* data,size_t size){
 	return 0;
 }
 int SSCS_object_remove_data(sscso* obj,byte* label){
+	debugprint();
 	if(!label)return -1;
 	byte *buf_ptr = obj->buf_ptr;
 	if(!buf_ptr)return -1;
@@ -207,6 +215,7 @@ int SSCS_object_remove_data(sscso* obj,byte* label){
 	return 0;
 }
 sscsd* SSCS_object_data(sscso* obj,byte* label){
+	debugprint();
 	byte* buf_ptr = obj->buf_ptr;
 	size_t allocated = obj->allocated;
 	size_t label_len = strlen((const char*)label);
@@ -228,7 +237,6 @@ sscsd* SSCS_object_data(sscso* obj,byte* label){
 	/* Run loop again to read encoded string */
 	while(readpointer[i] != '"' && readpointer[i+1] != ';'){ //Get base64encoded data 
 		if(!((size_t)((readpointer+i) - buf_ptr) < allocated) || b64encoded_len < i){
-			//puts("Outsize of memory bounds");
 			cfree(b64buffer);
 			return NULL;
 		}
@@ -243,6 +251,7 @@ sscsd* SSCS_object_data(sscso* obj,byte* label){
 	return final;
 }
 sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after every run.
+	debugprint();
 	if(index > 4096)return NULL; //support a max of 4096 items
 	byte* buf_ptr = list->buf_ptr;
 	size_t allocated = list->allocated;
@@ -286,6 +295,7 @@ sscsd* SSCS_list_data(sscsl* list,unsigned int index){ //Auto incriments after e
 	return final;
 }
 byte* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
+	debugprint();
 	byte* retptr = cmalloc(obj->allocated+2);
 	memcpy(retptr,obj->buf_ptr,obj->allocated);
 	*(retptr+obj->allocated+1) = '\0';	
@@ -293,23 +303,28 @@ byte* SSCS_object_encoded(sscso* obj){ //Get string to send over socket
 }
 
 size_t SSCS_object_encoded_size(sscso* obj){ //Get size of string(often needs to be specified when sending over socket)
+	debugprint();
 	return obj->allocated;	
 } 
 byte* SSCS_list_encoded(sscsl* list){
+	debugprint();
 	byte* retptr = cmalloc(list->allocated+1);
 	memcpy(retptr,list->buf_ptr,list->allocated);
 	*(retptr+list->allocated) = '\0';
 	return retptr;
 }
 size_t SSCS_list_encoded_size(sscsl* list){
+	debugprint();
 	return list->allocated;
 }
 
 byte* SSCS_data_get_data(sscsd* data){
+	debugprint();
 	return data->data;
 }
 
 size_t SSCS_data_get_size(sscsd* data){
+	debugprint();
 	return data->len;
 }
 /* UNUSED because all functions allocated a new sscso object and dont reuse 
@@ -321,17 +336,20 @@ void SSCS_free(sscso* obj){ //Frees current buffer associated with sscso obj (Ob
 */
 
 void SSCS_release(sscso** obj){ //Frees the current buffer AND the structure holding the address to the buffer; (Object Cant be Reused)
+	debugprint();
 	cfree(((*obj)->buf_ptr));
 	cfree(*obj);
 	*obj = NULL;
 }
 void SSCS_data_release(sscsd** data){ //Frees the data buffer AND the structure holding the address and the length
+	debugprint();
 	if(*data == NULL)return;
 	cfree(((*data)->data));
 	cfree(*data);
 	*data = NULL;	
 }
 void SSCS_list_release(sscsl** list){
+	debugprint();
 	if(*list == NULL)return;
 	if((*list)->buf_ptr != NULL)cfree(((*list)->buf_ptr));
 	cfree(*list);
@@ -341,6 +359,7 @@ void SSCS_list_release(sscsl** list){
 * Wrappers for SSCS_object_data() to simplify usage 
 */
 int SSCS_object_int(sscso* obj,byte* label){
+	debugprint();
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(int)){
@@ -353,6 +372,7 @@ int SSCS_object_int(sscso* obj,byte* label){
 	return retval;
 }
 double SSCS_object_double(sscso* obj,byte* label){
+	debugprint();
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return -1;
 	if(data->len != sizeof(double)){
@@ -365,6 +385,7 @@ double SSCS_object_double(sscso* obj,byte* label){
 	return retval;
 }
 unsigned char* SSCS_object_string(sscso* obj,byte* label){
+	debugprint();
 	sscsd* data = SSCS_object_data(obj,label);
 	if(data == NULL)return NULL;
 	unsigned char* ret_ptr = cmalloc(data->len+2);

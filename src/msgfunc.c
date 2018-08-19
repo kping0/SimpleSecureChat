@@ -20,6 +20,7 @@
 #include "msgfunc.h"
 
 byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db){ //returns b64 of binnobj that includes b64encryptedaeskey,aeskeylength,b64encrypedbuffer,encbuflen,b64iv,ivlen
+	debugprint();
 	if(strlen((byte*)message) > 1024){
 		cerror("Message to long to send (limit is 1024 characters)");
 		return NULL;	
@@ -93,6 +94,7 @@ byte* encrypt_msg(byte* username,byte* message,EVP_PKEY* signingKey,sqlite3* db)
 
 	
 byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Attempts to decrypt buffer with your private key
+	debugprint();
 	if(encrypted_buffer == NULL){
 		cinfo("encrypted_buffer passed is NULL, returning NULL");
 		return NULL;	
@@ -207,6 +209,8 @@ byte* decrypt_msg(byte *encrypted_buffer,EVP_PKEY* privKey,sqlite3* db){ // Atte
  */
 int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pkey)
 {
+
+	debugprint();
     /* Returned to caller */
     int result = -1;
     
@@ -308,6 +312,7 @@ int sign_msg(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* p
 
 int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_PKEY* pkey)
 {
+	debugprint();
     /* Returned to caller */
     int result = -1;
     if(!msg)assert(0);
@@ -383,6 +388,7 @@ int verify_msg(const byte* msg, size_t mlen, const byte* sig, size_t slen, EVP_P
 }
 
 void filter_string(byte* string){
+	debugprint();
 #ifndef RAW_MESSAGE_OUTPUT
 	int i = 0;
 	int string_l = strlen(string);

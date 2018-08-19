@@ -20,6 +20,7 @@
 #include "loadconfig_client.h"
 
 SCONFIG* loadconfig_client(void){
+	debugprint();
 	char* home_dir = secure_getenv("HOME");
 	size_t home_dir_l = strlen(home_dir);
 	size_t data_dir_l = home_dir_l + 17;
@@ -62,6 +63,7 @@ SCONFIG* loadconfig_client(void){
 		sconfig_set_str(config,"DB_FNAME",db_file);
 		sconfig_set_str(config,"PUB_KEY",pub_file);
 		sconfig_set_str(config,"PRIV_KEY",priv_file);
+		sconfig_set_str(config,"LOG_FILE",log_file);
 		sconfig_write(config);
 	}
 	else{

@@ -30,6 +30,7 @@
 #include "cstdinfo.h"
 
 void usage(char* argv[]){
+	debugprint();
 	fprintf(stdout,"USAGE:   %s [TYPE] [LABEL] [DATA]\n",argv[0]);
 	fprintf(stdout,"EXAMPLE: %s int label_for_integer 10\n",argv[0]);
 	fprintf(stdout,"EXAMPLE: %s str label_for_string this is sample string\n",argv[0]);
@@ -38,6 +39,7 @@ void usage(char* argv[]){
 	exit(EXIT_FAILURE);
 }
 int main(int argc,char* argv[]){
+	debugprint();
 	if(argc <= 2)usage(argv);
 	char* home_dir = secure_getenv("HOME");
 	size_t home_dir_l = strlen(home_dir);

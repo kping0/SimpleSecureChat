@@ -19,6 +19,7 @@
 
 #include "gui.h"
 void init_gui(struct sscswidgets_gui* data){
+	debugprint();
 	sqlite3_stmt* stmt;
 	sqlite3* db = (data->backend_vars)->db;
 	sqlite3_prepare_v2(db,"select username from knownusers where NOT uid=0",-1,&stmt,NULL); //uid(0) is testuser 
@@ -31,6 +32,7 @@ void init_gui(struct sscswidgets_gui* data){
 	return;
 }
 void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages GtkListBox and received_messages
+	debugprint();
 	GtkContainer* container = (GtkContainer*)data->messagelist;	
 	GList *children, *iter;
 	children = gtk_container_get_children(GTK_CONTAINER(container));
@@ -49,6 +51,7 @@ void clear_messages_gui(struct sscswidgets_gui* data){ //clear sent messages Gtk
 }
 
 static void internal_create_new_label(GtkWidget* list,byte* item){
+	debugprint();
 	GtkWidget* label = gtk_label_new(item);
 	gtk_container_add((GtkContainer*)list,label);
 	gtk_widget_show(label);
@@ -56,6 +59,7 @@ static void internal_create_new_label(GtkWidget* list,byte* item){
 }
 
 static void internal_create_blank_label(GtkWidget* list){
+	debugprint();
 	GtkWidget* label = gtk_label_new("");
 	gtk_container_add((GtkContainer*)list,label);
 	gtk_widget_show(label);
@@ -63,6 +67,7 @@ static void internal_create_blank_label(GtkWidget* list){
 }
 
 void append_list_string_gui(GtkWidget* list,GtkWidget* other_list,byte* item){ //add string to container list and space to other_list
+	debugprint();
 	int maxperline = 32;
 	int rem_l = strlen(item);
 	char temp[maxperline+1];
@@ -82,13 +87,14 @@ void append_list_string_gui(GtkWidget* list,GtkWidget* other_list,byte* item){ /
 	return;
 }
 void internal_scroll_window_msg_bottom_gui_2(GtkWidget* unused,void* data){ /* wrapper for internal_scroll_window_msg_bottom_gui() so that it can be used as a Gtk Callback function */
+	debugprint();
 	(void)unused;
 	internal_scroll_window_msg_bottom_gui((struct sscswidgets_gui*)data);
 	return;
 }
-void* internal_scroll_window_msg_bottom_gui(void* data){
-	/* sleeping here fixes the issue (if called from seperate thread) */
-	struct sscswidgets_gui* widgets = data;
+void internal_scroll_window_msg_bottom_gui(struct sscswidgets_gui* widgets){
+	debugprint();
+
 	GtkScrolledWindow* scrwin = (GtkScrolledWindow*)widgets->messagescrollwindow;
 
 	gdouble upper = 0;
@@ -105,10 +111,11 @@ void* internal_scroll_window_msg_bottom_gui(void* data){
 	adjVal = upper - pgsz;
 	gtk_adjustment_set_value(vAdj,adjVal); 
 	gtk_scrolled_window_set_vadjustment(GTK_SCROLLED_WINDOW(scrwin),vAdj);
-	return NULL;
+	return;
 }
 
 void change_current_user_gui(GtkWidget* widget,gpointer data){
+	debugprint();
 	(void)widget;
 	struct sscsbutton_gui* pobj = data;
 	clear_messages_gui(pobj->widgets);
@@ -123,6 +130,7 @@ void change_current_user_gui(GtkWidget* widget,gpointer data){
 }
 
 void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,byte* contactname){
+	debugprint();
 	size_t contactname_len = strlen(contactname);
 	if(contactname_len <= 0 || contactname_len >= 100)return;
 	struct sscsbutton_gui* passedstruct = malloc(sizeof(struct sscsbutton_gui));
@@ -140,6 +148,7 @@ void add_contact_gui(GtkWidget* contactslist,struct sscswidgets_gui* widgets,byt
 }
 
 void send_message_entry_gui(GtkEntry* entry,gpointer data){
+	debugprint();
 
 	struct sscswidgets_gui* widgets = data;
 
@@ -151,14 +160,13 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 	GtkWidget* messagelist = widgets->messagelist;	
 	GtkWidget* mainwin = widgets->window;
 
-	append_list_string_gui(messagelist,widgets->recvlist,message);
-	cdebug("Sending Message to %s\n",*(widgets->current_username));
-
+	if(!username)return; /* saveguard to check if user has selected a user(in the gui) so that the initial user is not NULL (causing this code to SEGFAULT) */
 	byte* encbuf = (byte*)encrypt_msg(username,(byte*)message,priv_evp,db); //"user" would be the receiving username
 	if(!encbuf){
 		cerror("Could not encrypt message");
 		return;
 	}
+	cdebug("Sending Message to %s\n",*(widgets->current_username));
 	cdebug("Encrypted message: %s with length: %d\n",encbuf,(int)strlen(encbuf));
 
 	BIO_write(srvconn,encbuf,strlen(encbuf));
@@ -170,6 +178,8 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 		return;
 	}
 
+	append_list_string_gui(messagelist,widgets->recvlist,message); /* append item to chat only after server ack */
+
 	sqlite3_stmt* stmt;
 	sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,1,?1,?2);",-1,&stmt,NULL);
 	sqlite3_bind_int(stmt,1,get_user_uid(username,db));
@@ -180,14 +190,12 @@ void send_message_entry_gui(GtkEntry* entry,gpointer data){
 
 	gtk_entry_set_text(entry,"");
 	internal_scroll_window_msg_bottom_gui(widgets);
-#ifdef TESTING
-	start_clear_thread(widgets);
-#endif
 	gtk_widget_show_all(mainwin);
 	return;
 }
 
 void add_user_entry_gui(GtkEntry* entry,gpointer data){
+	debugprint();
 	struct sscswidgets_gui* widgets = data;
 	byte* username = (byte*)gtk_entry_get_text(GTK_ENTRY(entry));
 #ifdef DEBUG
@@ -199,6 +207,7 @@ void add_user_entry_gui(GtkEntry* entry,gpointer data){
 }
 
 void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
+	debugprint();
 	GtkWidget* contactslist =  widgets_gui->contactslist;
 
 	sqlite3* db = ((widgets_gui->backend_vars)->db);
@@ -237,6 +246,7 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
 	return;
 }
 gboolean getmessages_gui(void* data){ //get message & add them to db
+	debugprint();
 	//Get Variables from passed structure
 	sqlite3* db = (((sscvars_gui*)data)->backend_vars)->db;
 	sqlite3_stmt* stmt;

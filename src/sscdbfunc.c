@@ -54,8 +54,8 @@ int nsleep(long miliseconds){ //Thread Safe Sleep
 
    return nanosleep(&req , &rem);
 }
-
 sqlite3* init_db(char* dbfname){
+	debugprint();
 	sqlite3 *db;
 	sqlite3_stmt *stmt;
 	int rc = sqlite3_open(dbfname,&db);
@@ -91,6 +91,7 @@ sqlite3* init_db(char* dbfname){
 }
 
 void add_known_user(char* username,RSA *userpubkey,sqlite3 *db,char* authkey){ // adds user to DB
+	debugprint();
 	unsigned char *buf,*b64buf;
 	int len;
 	sqlite3_stmt *stmt;
@@ -112,6 +113,7 @@ void add_known_user(char* username,RSA *userpubkey,sqlite3 *db,char* authkey){ /
 }
 
 int get_user_uid(char* username,sqlite3 *db){ //gets uid from user (to add a message to db for ex.)
+	debugprint();
 	int uid = -1; //default is error	
 	char *newline = strchr(username,'\n');
 	if ( newline ) *newline = 0;
@@ -126,6 +128,7 @@ int get_user_uid(char* username,sqlite3 *db){ //gets uid from user (to add a mes
 	return uid;
 }
 int db_user_init(sqlite3 *db,char* pkeyfn){ //check for own user & create if not found
+	debugprint();
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,"select username from knownusers where uid=1",-1,&stmt,NULL); //check for own user.
 	if(sqlite3_step(stmt) == SQLITE_ROW){
@@ -149,13 +152,13 @@ int db_user_init(sqlite3 *db,char* pkeyfn){ //check for own user & create if not
 			case 'y':
 				break;
 			default:
-				puts("exiting...");
+				cerror("please restart binary to resupply username");
 				return 0;
 		}
 		//create entry in DB if run for the first time
 		BIO* rsa_pub_bio = BIO_new_file(pkeyfn,"r");
 		if(rsa_pub_bio == NULL){
-			puts("error loading public key!"); //error checking
+			cerror("could not load public key!");
 			return 0;	
 		}
 		RSA* rsa_pubk = RSA_new();
@@ -163,7 +166,7 @@ int db_user_init(sqlite3 *db,char* pkeyfn){ //check for own user & create if not
 		unsigned char* authkey = malloc(512);
 		RAND_poll();
 		if(RAND_bytes(authkey,512) != 1){
-			puts("Generating authkey ERROR");
+			cerror("could not generate authkey with CSPRNG ");
 			return 0;
 		}
 		char* b64authkey = base64encode(authkey,512);
@@ -179,6 +182,7 @@ int db_user_init(sqlite3 *db,char* pkeyfn){ //check for own user & create if not
 }
 
 EVP_PKEY *get_pubk_uid(int uid,sqlite3 *db){ //Get public key based on UID
+	debugprint();
 	EVP_PKEY *pubkey = EVP_PKEY_new();
 	sqlite3_stmt *stmt;
 	RSA* x = NULL;
@@ -199,6 +203,7 @@ EVP_PKEY *get_pubk_uid(int uid,sqlite3 *db){ //Get public key based on UID
 }
 
 EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based on Username
+	debugprint();
 	int uid = get_user_uid(username,db); //get UID for username
 	EVP_PKEY *pubkey = EVP_PKEY_new();
 	sqlite3_stmt *stmt;
@@ -224,6 +229,7 @@ EVP_PKEY *get_pubk_username(char* username,sqlite3 *db){ // Get public key based
 
 }
 const char* register_user_str(sqlite3* db){ //returns string you can pass to server to register your user with your public key.
+	debugprint();
 
 	sqlite3_stmt *stmt;
 	int rsalen;
@@ -236,7 +242,7 @@ const char* register_user_str(sqlite3* db){ //returns string you can pass to ser
 		authkey = (unsigned char*)sqlite3_column_text(stmt,2); //get authkey 
 	}
 	else{
-		puts("Cannot get userpubkey for registering user.");
+		cerror("could not get user public key for registering your user.");
 		sqlite3_finalize(stmt);
 		return NULL;
 	}
@@ -256,6 +262,7 @@ const char* register_user_str(sqlite3* db){ //returns string you can pass to ser
 }
 
 const char* server_get_user_rsa(char* username){ //Generates a character array that can be sent the message buffer server to request a userpublickey
+	debugprint();
 	sscso* obj = SSCS_object();
 	char* newline = strchr(username,'\n');
 	if(newline)*newline=0;
@@ -268,6 +275,7 @@ const char* server_get_user_rsa(char* username){ //Generates a character array t
 }
 
 const char* server_get_messages(sqlite3* db){ //Generates a character array that can be sent to message buffer server to receive back your stored encrypted message
+	debugprint();
 	char* username = get_muser(db);
 	if(!username)return NULL;
 	sscso* obj = SSCS_object();
@@ -281,6 +289,7 @@ const char* server_get_messages(sqlite3* db){ //Generates a character array that
 }
 
 char* get_muser(sqlite3* db){ // Returns the main Username (user with the uid of 1)
+	debugprint();
 	sqlite3_stmt* stmt;
 	sqlite3_prepare(db,"select username from knownusers where uid=1",-1,&stmt,NULL);
 	char* muser = malloc(200);
@@ -296,6 +305,7 @@ char* get_muser(sqlite3* db){ // Returns the main Username (user with the uid of
 }
 
 char* auth_usr(sqlite3* db){
+	debugprint();
 	sqlite3_stmt* stmt;
 	char* authkey = NULL;
 	sqlite3_prepare_v2(db,"select authkey from knownusers where uid=1;",-1,&stmt,NULL);
@@ -324,6 +334,7 @@ char* auth_usr(sqlite3* db){
  * Only used by the ncurses cli 
  */ 
 void start_message_update(void* data){
+	debugprint();
  #ifdef SSC_UPDATE_THREAD /* failsafe check so we dont update twice */
 	pthread_t tid;
 	int error = pthread_create(&tid,NULL,message_update_spawner,data);
@@ -334,6 +345,7 @@ void start_message_update(void* data){
 
 /* Spawned by start_message_update,spawns an update thread every one second */ 
 void* message_update_spawner(void* data){
+	debugprint();
 	pthread_t tid;
 	int error;
 	while(1){
@@ -347,6 +359,7 @@ void* message_update_spawner(void* data){
 
 /* Spawned by message_update_spawner */
 void* update_messages_db(void* data){
+	debugprint();
 	SSCGV* gv = (SSCGV*)data;
 	sqlite3* db = gv->db;
 	sqlite3_stmt* stmt;

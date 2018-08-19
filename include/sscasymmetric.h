@@ -40,6 +40,7 @@
 
 #include "settings.h"
 #include "cstdinfo.h"
+#include "simpleconfig.h"
 
 int envelope_open(EVP_PKEY *priv_key, byte *ciphertext, int ciphertext_len,
 	byte *encrypted_key, int encrypted_key_len, byte *iv,

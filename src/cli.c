@@ -184,7 +184,7 @@ byte* ssc_cli_currently_selected(WIN* p_win){
 }
 
 /*
- * sync the message tabs
+ * sync the message tabs to be on the same page with index page_index
  */
 void ssc_cli_msg_page_sync(SSCGV* gv){
 	debuginfo();
@@ -198,11 +198,11 @@ void ssc_cli_msg_page_sync(SSCGV* gv){
 		follower = gv->sent;
 	}
 	int index = current->page_index;
-	follower->current_page = follower->pages[index];	
+	follower->current_page = follower->pages[index]; // adjust the follower to the index of current
 	follower->page_index = index;	
-	ssc_cli_window_reload(current);
+	ssc_cli_window_reload(current); // reload windows
 	ssc_cli_window_reload(follower);
-	ssc_cli_switch_current(current);
+	ssc_cli_switch_current(current);  
 	return;	
 }
 
@@ -213,8 +213,8 @@ void ssc_cli_next_page(SSCGV* gv){
 	debuginfo();
 	WIN* p_win = gv->current;
 	if(p_win->page_index == p_win->page_count)return;	
-	p_win->page_index++;
-	p_win->current_page = p_win->pages[p_win->page_index];
+	p_win->page_index++; // increase the page index by 1
+	p_win->current_page = p_win->pages[p_win->page_index]; 
 	ssc_cli_window_reload(p_win);
 	ssc_cli_switch_current(p_win);
 	return;
@@ -227,7 +227,7 @@ void ssc_cli_prev_page(SSCGV* gv){
 	debuginfo();
 	WIN* p_win = gv->current;
 	if(p_win->page_index <= 1)return;		
-	p_win->page_index--;
+	p_win->page_index--; // decrease the page index by 1
 	p_win->current_page = p_win->pages[p_win->page_index];
 	ssc_cli_window_reload(p_win);
 	ssc_cli_switch_current(p_win);
@@ -241,7 +241,7 @@ void ssc_cli_last_page(SSCGV* gv){
 	debuginfo();
 	WIN* p_win = gv->current;
 	if(p_win->page_index == p_win->page_count)return;
-	p_win->page_index = p_win->page_count;
+	p_win->page_index = p_win->page_count; // go to the last page that is not empty
 	p_win->current_page = p_win->pages[p_win->page_index];
 	ssc_cli_window_reload(p_win);
 	ssc_cli_switch_current(p_win);
@@ -268,14 +268,15 @@ void ssc_cli_add_item(WIN* p_win,byte* block){
 		ssc_cli_switch_current(p_win);
 		return;
 	}
-	size_t blocksize = strlen(block);
+	size_t blocksize = strlen(block); 
 	byte* saved_block = calloc(1,blocksize);	
-	memcpy(saved_block,block,blocksize);
-	current_page->screen_content[elements+1] = saved_block;
-	mvwprintw(stdscr,y+1+elements,x+1,"%s",saved_block);
-	mvhline(y+2+elements,x+1,p_win->border.bs,w - 1);
-	current_page->elements+= 2;
-	getyx(stdscr,y,x);
+	memcpy(saved_block,block,blocksize); // copy the passed block to a seperate address
+	current_page->screen_content[elements+1] = saved_block; // add the address to the array for the page
+	mvwprintw(stdscr,y+1+elements,x+1,"%s",saved_block); // write the block to screen
+	mvhline(y+2+elements,x+1,p_win->border.bs,w - 1); // add space
+	current_page->elements+= 2; // increase the elements on the page by 2 (block + space)
+
+	getyx(stdscr,y,x); //reset cursor
 	y--;
 	move(y,x);
 	return;
@@ -539,6 +540,7 @@ void ssc_cli_msg_upd(SSCGV* gv,byte* username){
 	int saved_c_sent,saved_c_recv;
 	int i,x;
 	int page_count = sent->page_count;
+	if(!(sent && sent->current_page))return;
 	saved_c_sent = sent->current_page->currently_selected;
 	for(i = 0;i<=page_count;i++){
 		_page = sent->pages[i];
@@ -755,8 +757,24 @@ void ssc_cli_cmd_parser(SSCGV* gv,byte* userinput){
 		return;
 	}
 	else if(strncmp(userinput,"switch",6) == 0){
+		byte* usrname = userinput+7;
+		byte* contact_temp = NULL;
+		unsigned int usrname_l = strlen(usrname);
+		WPAGE* current_page_contacts = gv->contacts->current_page;
+
+		for(int i = 0;i<=current_page_contacts->elements;i++){
+			contact_temp = current_page_contacts->screen_content[i];
+			if(contact_temp != NULL){
+				if(usrname_l == strlen(contact_temp)){
+					if(strncmp(usrname,contact_temp,usrname_l) == 0){
+						current_page_contacts->currently_selected = i;
+						break;
+					}
+				}
+			}
+		}
 		ssc_cli_msg_clear(gv);
-		ssc_cli_msg_upd(gv,userinput+7);
+		ssc_cli_msg_upd(gv,usrname);
 	}
 	else if(strncmp(userinput,"delete",6) == 0){
 		debugstdscr("delete");	
@@ -771,5 +789,34 @@ void ssc_cli_cmd_parser(SSCGV* gv,byte* userinput){
 	}
 		debugstdscr(userinput);
 		ssc_cli_switch_current(gv->current);
+	return;
+}
+
+void ssc_cli_reload_all(SSCGV* gv){
+	clear(); /* clear screen */
+	
+	attron(COLOR_PAIR(2));
+	ssc_cli_cust_updwin(gv->contacts,TRUE);
+	ssc_cli_cust_updwin(gv->sent,TRUE);
+	ssc_cli_cust_updwin(gv->received,TRUE);
+	attroff(COLOR_PAIR(2));
+	
+	int col,row;
+	getmaxyx(stdscr,row,col);
+	
+	attron(COLOR_PAIR(1));
+	attron(A_REVERSE);
+
+	mvwprintw(stdscr,1,(col * 0.02 + 2)," Contacts ");
+	mvwprintw(stdscr,1,(gv->received->startx + 2)," Received ");
+	mvwprintw(stdscr,1,(gv->sent->startx + 2)," Sent ");
+
+	attroff(A_REVERSE);
+
+	ssc_cli_reload_contacts(gv);
+	ssc_cli_window_reload(gv->sent);
+	ssc_cli_window_reload(gv->received);
+
+	ssc_cli_switch_current(gv->current);
 	return;
 }

@@ -56,7 +56,7 @@ typedef unsigned char byte;
 /* if you want raw unfiltered message output, otherwise only subset of ASCII */
 	// #define RAW_MESSAGE_OUTPUT
 
-/* do you want one line of log for every function executed ? (DEBUG) */
+/* log EVERY function call (DEBUG) */
 	// #define SSC_FUNCTION_LOG
 
 

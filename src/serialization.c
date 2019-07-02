@@ -75,7 +75,7 @@ int SSCS_list_add_data(sscsl* list,byte* data,size_t size){
 	size_t encoded_size;
 	byte* b64data = mitbase64_encode(data,size,&encoded_size);
 	int b64datalen = encoded_size;
-	if(old_buf_items >= 1000000)return -1; //If more than 1M items exists exit
+	if(old_buf_items >= 100000)return -1; //If more than 100K items exists exit
 	byte label[12];
 	sprintf(label,"%zd:\"",old_buf_items+1);
 	int label_len = strlen((const char*)label);

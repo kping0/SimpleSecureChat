@@ -118,5 +118,6 @@ void ssc_cli_reload_contacts(SSCGV* gv);
 
 void ssc_cli_msg_upd(SSCGV* gv,byte* username);
 	
+void ssc_cli_reload_all(SSCGV* gv);
 
 #endif /* SSC_CLI_MENU_HEADER */

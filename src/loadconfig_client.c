@@ -65,7 +65,7 @@ SCONFIG* loadconfig_client(void){
 		sconfig_set_str(config,"PRIV_KEY",priv_file);
 		sconfig_set_str(config,"LOG_FILE",log_file);
 		sconfig_write(config);
-	}
+	}		
 	else{
 		config = sconfig_load(config_file);
 	}

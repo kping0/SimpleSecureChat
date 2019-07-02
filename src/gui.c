@@ -215,7 +215,8 @@ void addnewuser_gui(struct sscswidgets_gui* widgets_gui,byte* username){
 	BIO_write(((widgets_gui->backend_vars)->connection_variables)->bio_obj,gtrsa64,strlen(gtrsa64));
 	free(gtrsa64);
 	byte* rxbuf = calloc(1,4096);
-	BIO_read(((widgets_gui->backend_vars)->connection_variables)->bio_obj,rxbuf,4096);
+	BIO_read(((widgets_gui->backend_vars)->connection_variables)->bio_obj,rxbuf,4095);
+	rxbuf[4095] = '\0'; /* add NULL terminator */
 #ifdef DEBUG
 	fprintf(stdout,"DEBUG: got usersaobj %s from srv\n",rxbuf);
 #endif
@@ -260,13 +261,12 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 	if(!getmsgbuf)return 0;
 
 	byte* decbuf = NULL;
-	byte* recvbuf = malloc(200000);
+	byte* recvbuf = calloc(1,200000);
 	BIO_write(srvconn,getmsgbuf,strlen(getmsgbuf));	//Send buffer to server
 	free(getmsgbuf);
-	memset(recvbuf,'\0',200000);
 	BIO_read(srvconn,recvbuf,199999); //Read response
-
-	if(strcmp(recvbuf,"ERROR") != 0){
+	recvbuf[199999] = 0x0;
+	if(strncmp(recvbuf,"ERROR",5) != 0){
 #ifndef RELEASE_IMAGE
 	cdebug("received response from server -- %s",recvbuf);	
 #endif
@@ -292,7 +292,7 @@ gboolean getmessages_gui(void* data){ //get message & add them to db
 			decbuf = (byte*)decrypt_msg(obj2->buf_ptr,priv_evp,db);	
 			if(!decbuf)break;
 			filter_string(decbuf); /* filter down to small subset of ASCII */
-			if(decbuf)cdebug("Decrypted Message from %s: %s\n",sender,decbuf); 
+			cdebug("Decrypted Message from %s: %s\n",sender,decbuf); 
 			sqlite3_prepare_v2(db,"insert into messages(msgid,uid,uid2,message)values(NULL,?1,1,?2);",-1,&stmt,NULL);	
 			sqlite3_bind_int(stmt,1,get_user_uid(sender,db));
 			sqlite3_bind_text(stmt,2,decbuf,-1,0);

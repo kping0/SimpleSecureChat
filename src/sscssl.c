@@ -33,6 +33,8 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 
+#define FATAL() if(1){cerror("FATAL CONNECTION ERROR, please contact server owner and submit this error message ");return 0;}
+
 int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ //return 1 on success, 0 on error
 
 	long chkv = 1; /*Variable for error checking*/
@@ -45,9 +47,9 @@ int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ /
 	tls_vars->ctx = NULL;
 	tls_vars->sslmethod = NULL;
 	tls_vars->sslmethod = SSLv23_method();
-	if(!(NULL != tls_vars->sslmethod)) return 0;
+	if(!(NULL != tls_vars->sslmethod)) FATAL();
 	tls_vars->ctx = SSL_CTX_new(tls_vars->sslmethod); /* Generate SSL_CTX*/
-	if(!(tls_vars->ctx != NULL)) return 0;
+	if(!(tls_vars->ctx != NULL)) FATAL();
 
 	/*
 	* Set options for validation(verify against hostcert) & connection(!SSLv2 & !SSLv3 & !Compression)
@@ -57,31 +59,31 @@ int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ /
 	SSL_CTX_set_verify_depth(tls_vars->ctx,1); 
 	SSL_CTX_set_options(tls_vars->ctx,SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
 	chkv = SSL_CTX_load_verify_locations(tls_vars->ctx,hostcert,NULL); /*Verify Server Certificate*/
-	if(!(1 == chkv)) return 0;
+	if(!(1 == chkv)) FATAL();
 
 	/*
 	* Set connection variables 
 	*/	
 	
 	tls_vars->bio_obj = BIO_new_ssl_connect(tls_vars->ctx);
-	if(!(tls_vars->bio_obj != NULL)) return 0;
+	if(!(tls_vars->bio_obj != NULL)) FATAL();
 	char conndetails[22]; /* xxx.xxx.xxx.xxx:yyyyy */ 
 	sprintf(conndetails,"%s:%s",hostip,port);
 	chkv = BIO_set_conn_hostname(tls_vars->bio_obj, conndetails);
-	if(!(1 == chkv)) return 0;
+	if(!(1 == chkv)) FATAL();
 	BIO_get_ssl(tls_vars->bio_obj, &tls_vars->ssl_obj);
-	if(!(tls_vars->bio_obj != NULL)) return 0;
+	if(!(tls_vars->bio_obj != NULL)) FATAL();
 	chkv = SSL_set_cipher_list(tls_vars->ssl_obj,"HIGH:!aNULL:!eNULL:!PSK:!MD5:!RC4:!SHA1");
-	if(!(1 == chkv)) return 0;
+	if(!(1 == chkv)) FATAL();
 
 	/* 
 	* Connect && Do Handshake
 	*/
 
 	chkv = BIO_do_connect(tls_vars->bio_obj);
-	if(!(1 == chkv)) return 0;	
+	if(!(1 == chkv)) FATAL();
 	chkv =BIO_do_handshake(tls_vars->bio_obj);
-	if(!(1 == chkv)) return 0;
+	if(!(1 == chkv)) FATAL();
 
 	/*
 	* Check for certificate
@@ -93,7 +95,7 @@ int tls_conn(struct ssl_str *tls_vars,char* hostcert,char* hostip,char* port){ /
 		}
 	if(NULL == cert_test){
 		cerror("no certificate provided by the server (ERR_NO_CERT)");
-		return 0;
+		FATAL();
 	}
 
 	return 1;

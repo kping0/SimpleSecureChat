@@ -166,17 +166,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkButton" id="test_func">
-                <property name="label" translatable="yes">test_func</property>
-                <property name="name">test_func</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">True</property>
-              </object>
-              <packing>
-                <property name="left_attach">0</property>
-                <property name="top_attach">0</property>
-              </packing>
+              <placeholder/>
             </child>
           </object>
           <packing>

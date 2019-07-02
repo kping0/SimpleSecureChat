@@ -61,7 +61,7 @@ gboolean timedupdate_gui(void* data){
 	debugprint();
 	clear_messages_gui(data);	
 	getmessages_gui(data);
-//	internal_scroll_window_msg_bottom_gui(data);
+	internal_scroll_window_msg_bottom_gui(data);
 	return 1;
 }
 
@@ -297,7 +297,7 @@ int main(void){
 	attroff(A_BOLD);
 	ssc_cli_add_item(help_window,(byte*)"To enter a command, hit ':' .");
 	ssc_cli_add_item(help_window,(byte*)"Commands can be used for many things, like: ");
-	ssc_cli_add_item(help_window,(byte*)"Sending messages ':send username message'");
+	ssc_cli_add_item(help_window,(byte*)"Sending messages ':send username'");
 	ssc_cli_add_item(help_window,(byte*)"Adding friends ':add username'");
 	ssc_cli_add_item(help_window,(byte*)"Switching users ':switch username'");
 	ssc_cli_add_item(help_window,(byte*)"Deleting users ':delete username' ");
@@ -464,6 +464,9 @@ int main(void){
 				ssc_cli_switch_current(gv->current); //update the cursor
 				ssc_cli_window_upd_highlight(gv); //update the highlighted item 
 				break;
+			case '0':
+				ssc_cli_reload_all(gv);
+				break;	
 		}
 		refresh(); // load changes
 	}

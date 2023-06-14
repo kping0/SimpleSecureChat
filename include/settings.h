@@ -68,7 +68,7 @@ typedef unsigned char byte;
 
 
 
-#define DEFAULT_HOST_NAME "52.14.103.245" /* default server ip */
+#define DEFAULT_HOST_NAME "0.0.0.0" /* default server ip */
 
 /* some macros for compatibility */
 #define cmalloc(x) calloc(1,x)
